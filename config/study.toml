@@ -29,6 +29,29 @@ min_total_s = 0
 # Abweichung vom Original-UEQ-S (7-stufig): Werte sind nicht mit den UEQ-Benchmarks vergleichbar.
 scale_min = 1
 scale_max = 5
+# WPForms-Formular-ID -> Variante ("Fragebogen (ML)" = 79, "Fragebogen (OP)" = 118)
+form_ids = { "79" = "ML", "118" = "OP" }
+# Zuordnung Formulareintrag -> Matomo-Besuch: Der Eintrag gehört zum Besuch derselben
+# Variante, dessen letzte Formulareingabe zeitlich am nächsten vor dem Absenden liegt.
+# Maximal erlaubter Abstand zwischen letzter Eingabe und Absenden (Sekunden):
+match_tolerance_s = 600
+# Manuelle Korrekturen der Zuordnung (entry_id -> idvisit), mit Begründung
+match_overrides_file = "config/match_overrides.csv"
+# Einzelne Formulareinträge ausschliessen (z. B. Tests), mit Begründung
+exclude_entries_file = "config/exclude_entries.csv"
+# Hinweis: variant_start gilt nur für die Maus-Aufzeichnung. Fragebogen der Menüversion
+# vom 26.10. sind gültig (das Formular funktionierte) und zählen für H3a/H3b.
+
+# Bewertung der Freitextantworten: Antwort gilt als richtig, wenn sie (ohne Gross-/
+# Kleinschreibung) mindestens einen Begriff enthält. Quelle: Texte der Website.
+# a1: "Aufgewachsen bin ich im Prättigau"; Schiers liegt im Prättigau und wird im
+#     Einleitungstext als Wohnort der Familie genannt -> beide gelten als richtig.
+# a2: "mit meinem Trainer Andrin Flury"
+# a3: "Gipfelgold Sporternährung"
+[questionnaire.answers]
+a1 = ["prättigau", "schiers"]
+a2 = ["andrin", "flury"]
+a3 = ["gipfelgold"]
 
 [variants]
 # Zuordnung eines Besuchs zur Variante anhand der URLs seiner Seitenaufrufe

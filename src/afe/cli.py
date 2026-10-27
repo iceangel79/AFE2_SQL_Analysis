@@ -52,6 +52,20 @@ def cmd_info(a) -> None:
     print(ds.visits[cols].to_string(index=False))
 
 
+def cmd_forms(a) -> None:
+    from .pipeline import build
+
+    ds = build(write=False)
+    if ds.entries is None:
+        print("Keine Fragebogendaten (weder WPForms-Tabelle im Dump noch data/manual/fragebogen.csv).")
+        return
+    print(ds.entry_flow.to_string(index=False))
+    print()
+    cols = ["entry_id", "variante", "submitted_local", "idvisit", "match_status", "match_diff_s",
+            "match_candidates", "entry_exclusion", "mouse_included", "task_success"]
+    print(ds.entries[cols].to_string(index=False))
+
+
 def cmd_images(a) -> None:
     from .dom import image_table
     from .load import connect
@@ -105,6 +119,7 @@ def main(argv: list[str] | None = None) -> None:
     s.set_defaults(func=cmd_all)
 
     sub.add_parser("info", help="Übersicht aller Besuche mit Variante und Ausschlussgrund").set_defaults(func=cmd_info)
+    sub.add_parser("fragebogen", help="Formulareinträge mit Zuordnung zum Besuch und Ausschlussgrund").set_defaults(func=cmd_forms)
     sub.add_parser("images", help="Bilder je Seite mit DOM-Position (zur Prüfung der AOI)").set_defaults(func=cmd_images)
 
     s = sub.add_parser("selectors", help="Meistbenutzte Elemente (CSS-Selektoren) je Seite")

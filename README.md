@@ -36,7 +36,7 @@ Bei Problemen die Umgebung neu aufbauen: `powershell -ExecutionPolicy Bypass -Fi
    nur diese Tabellen auswählen, Format SQL:
    `wp_matomo_log_action`, `wp_matomo_log_hsr`, `wp_matomo_log_hsr_blob`,
    `wp_matomo_log_hsr_event`, `wp_matomo_log_hsr_site`, `wp_matomo_log_visit`,
-   `wp_matomo_site_hsr`
+   `wp_matomo_site_hsr`, `wp_wpforms_entries`
 2. Die `.sql`-Datei nach `data\raw\` kopieren.
 3. Auswertung starten:
    ```
@@ -53,6 +53,7 @@ Bei Problemen die Umgebung neu aufbauen: `powershell -ExecutionPolicy Bypass -Fi
 | `afe.bat report` | Bericht, Excel-Tabellen und Grafiken in `output\` |
 | `afe.bat all` | alles zusammen |
 | `afe.bat info` | alle Besuche mit Variante und Ausschlussgrund |
+| `afe.bat fragebogen` | alle Formulareinträge mit Zuordnung zum Besuch und Ausschlussgrund |
 | `afe.bat images` | Bilder je Seite mit DOM-Position (AOI prüfen) |
 | `afe.bat selectors --page startseite` | meistbenutzte Elemente einer Seite |
 | `afe.bat notebook` | Jupyter Lab für explorative Analysen |
@@ -76,16 +77,24 @@ Ausgeschlossene Besuche werden nicht gelöscht, sondern mit Grund markiert.
 
 ## Fragebogendaten
 
-Die Antworten aus WPForms (E-Mail) werden manuell erfasst:
+Die Antworten werden direkt aus der WPForms-Tabelle `wp_wpforms_entries` gelesen.
+Beim Import werden E-Mail-Adresse (Verlosung), IP-Adresse und User-Agent entfernt.
 
-1. `config\templates\fragebogen_vorlage.csv` nach `data\manual\fragebogen.csv` kopieren.
-2. Pro Teilnehmenden eine Zeile; die `idvisit` beim Sichten der Session Recording in
-   Matomo ablesen (`afe.bat info` hilft beim Zuordnen über Zeitpunkt und Variante).
-3. Skalen: `ueq1`–`ueq8` und `seq1`–`seq3` als Rohwerte 1–5 (wie im Formular),
-   `a1_korrekt`–`a3_korrekt` als 0/1, `geschlecht` als `männlich`, `weiblich` oder `keine Angabe`.
-   Die E-Mail-Adresse für die Verlosung nicht übertragen.
+- **Bewertung der Antworten:** automatisch über Suchbegriffe in `config/study.toml`
+  (`[questionnaire.answers]`, Quelle: Texte der Website).
+- **Zuordnung zum Besuch:** automatisch über den Zeitpunkt. Ein Eintrag gehört zum Besuch derselben
+  Variante, dessen letzte Formulareingabe am nächsten beim Absenden liegt. Korrekturen in
+  `config/match_overrides.csv`, Ausschlüsse in `config/exclude_entries.csv`.
+- **Zwei Stichproben:**
+  - *Fragebogen-Stichprobe* (H3a, H3b): alle gültigen Einträge der Feldphase, auch ohne Aufzeichnung
+    (z. B. bei Tracking-Schutz im Browser).
+  - *Maus+Fragebogen-Stichprobe* (H1, H2, H4, H5): nur Einträge mit eingeschlossenem Besuch.
 
-Sobald die Datei existiert, rechnet `afe.bat report` die Hypothesentests mit.
+Skalen wie im Formular: UEQ-S und Schwierigkeit 1–5. Der Original-UEQ-S ist 7-stufig; die
+Werte sind daher nicht mit den UEQ-Benchmarks vergleichbar.
+
+Ohne WPForms-Tabelle im Dump kann der Fragebogen weiterhin manuell erfasst werden
+(`config\templates\fragebogen_vorlage.csv` nach `data\manual\fragebogen.csv` kopieren, mit `idvisit` und `variante`).
 
 ## Kennzahlen
 

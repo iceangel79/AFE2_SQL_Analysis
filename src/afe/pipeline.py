@@ -8,10 +8,10 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from . import clean, features, plots, stats
+from . import clean, features, forms, plots, stats
 from .config import DATA_PROCESSED, OUTPUT, StudyConfig, ensure_dirs, load_config
 from .load import connect
-from .questionnaire import QUESTIONNAIRE_FILE, load_questionnaire
+from .questionnaire import QUESTIONNAIRE_FILE, load_questionnaire, score
 
 
 @dataclass
@@ -21,10 +21,26 @@ class Dataset:
     events: pd.DataFrame
     visits: pd.DataFrame  # mit Kennzahlen pro Besuch
     flow: pd.DataFrame
+    entries: pd.DataFrame | None = None  # Fragebogen (ein Eintrag pro Zeile, mit Zuordnung)
+    entry_flow: pd.DataFrame | None = None
 
     @property
     def included(self) -> pd.DataFrame:
         return self.visits[self.visits["included"]]
+
+    @property
+    def questionnaire(self) -> pd.DataFrame | None:
+        """Eingeschlossene Fragebogen (für H3a, H3b)."""
+        return None if self.entries is None else self.entries[self.entries["entry_included"]]
+
+    @property
+    def mouse_questionnaire(self) -> pd.DataFrame | None:
+        """Besuche mit Kennzahlen + zugeordnetem Fragebogen (für H1, H2, H4, H5)."""
+        if self.entries is None:
+            return None
+        e = self.entries[self.entries["mouse_included"]].drop(
+            columns=["visit_variant", "visit_included", "visit_exclusion"], errors="ignore")
+        return self.included.merge(e, on="idvisit", how="inner")
 
 
 def build(cfg: StudyConfig | None = None, write: bool = True) -> Dataset:
@@ -35,11 +51,13 @@ def build(cfg: StudyConfig | None = None, write: bool = True) -> Dataset:
         pv = clean.load_pageviews(con, cfg)
         ev = clean.load_events(con, pv)
         visits = clean.build_visits(con, pv, cfg)
+        pvf = features.pageview_features(pv, ev, cfg)
+        vf = features.visit_features(visits, pvf)
+        vf = clean.apply_completion_rules(vf, cfg)
+        entries = _load_entries(con, vf, pvf, cfg)
     finally:
         con.close()
-    pvf = features.pageview_features(pv, ev, cfg)
-    vf = features.visit_features(visits, pvf)
-    vf = clean.apply_completion_rules(vf, cfg)
+    entry_flow = forms.entry_flow(entries) if entries is not None else None
     ev = ev.merge(vf[["idvisit", "variant", "included"]], on="idvisit", how="left")
     for name, mask in features._aoi_masks(ev, cfg).items():
         ev[f"aoi_{name}"] = mask
@@ -49,7 +67,28 @@ def build(cfg: StudyConfig | None = None, write: bool = True) -> Dataset:
         vf.to_csv(DATA_PROCESSED / "visits.csv", index=False)
         ev.to_csv(DATA_PROCESSED / "events.csv", index=False)
         flow.to_csv(DATA_PROCESSED / "stichprobe.csv", index=False)
-    return Dataset(cfg, pvf, ev, vf, flow)
+        if entries is not None:
+            entries.to_csv(DATA_PROCESSED / "fragebogen.csv", index=False)
+    return Dataset(cfg, pvf, ev, vf, flow, entries, entry_flow)
+
+
+def _load_entries(con, visits: pd.DataFrame, pvf: pd.DataFrame, cfg: StudyConfig) -> pd.DataFrame | None:
+    """Fragebogen aus WPForms (bevorzugt) oder aus der manuellen CSV."""
+    if forms.has_entries(con):
+        e = forms.code_answers(forms.parse_entries(con, cfg), cfg)
+        e = forms.match_entries(e, visits, pvf, cfg)
+    else:
+        q = load_questionnaire(cfg=cfg)
+        if q is None:
+            return None
+        e = q.copy()
+        e["entry_id"] = range(1, len(e) + 1)
+        e["submitted_local"] = pd.NaT
+        e["match_status"] = "manuell (CSV)"
+        if "variante" not in e:
+            e = e.merge(visits[["idvisit", "variant"]].rename(columns={"variant": "variante"}), on="idvisit", how="left")
+    e = forms.entry_exclusions(e, visits, cfg)
+    return score(e, cfg.scale_min, cfg.scale_max)
 
 
 def report(ds: Dataset | None = None) -> None:
@@ -62,15 +101,10 @@ def report(ds: Dataset | None = None) -> None:
     comparison = stats.compare_variants(inc, features.KEY_METRICS)
     sel = features.selector_summary(ds.events[ds.events["included"].fillna(False).astype(bool)])
 
-    q = load_questionnaire(cfg=ds.cfg)
     hyp = None
-    merged = None
-    if q is not None:
-        merged = inc.merge(q, on="idvisit", how="inner", suffixes=("", "_fb"))
-        unmatched = set(q["idvisit"].dropna()) - set(inc["idvisit"])
-        if unmatched:
-            warnings.warn(f"Fragebogen-Zeilen ohne eingeschlossenen Besuch: {sorted(unmatched)}")
-        hyp = stats.run_hypotheses(merged)
+    merged = ds.mouse_questionnaire
+    if ds.questionnaire is not None:
+        hyp = stats.run_hypotheses(merged, ds.questionnaire)
 
     figs = [plots.boxplots(inc, features.KEY_METRICS, fig_dir), plots.page_paths(ds.pageviews, ds.visits, fig_dir)]
     inc_ev = ds.events[ds.events["included"].fillna(False).astype(bool)]
@@ -85,7 +119,9 @@ def report(ds: Dataset | None = None) -> None:
         inc.to_excel(xw, sheet_name="Besuche", index=False)
         sel.head(500).to_excel(xw, sheet_name="Elemente", index=False)
         if hyp is not None:
+            ds.entry_flow.to_excel(xw, sheet_name="Stichprobe Fragebogen", index=False)
             hyp.to_excel(xw, sheet_name="Hypothesen", index=False)
+            ds.entries.drop(columns=["feedback"], errors="ignore").to_excel(xw, sheet_name="Fragebogen", index=False)
             merged.to_excel(xw, sheet_name="Besuche+Fragebogen", index=False)
 
     _write_markdown(ds, comparison, hyp, figs)
@@ -122,7 +158,7 @@ def _write_markdown(ds: Dataset, comparison: pd.DataFrame, hyp: pd.DataFrame | N
         f"- Richtungswechsel ab {cfg.direction_min_delta} Element-Einheiten, Pause ab {cfg.pause_ms} ms, "
         f"AOI-Deckel {cfg.dwell_cap_ms} ms",
         "",
-        "## Stichprobe",
+        "## Stichprobe Maus-Tracking (Besuche)",
         "",
         _fmt(ds.flow),
         "",
@@ -132,6 +168,15 @@ def _write_markdown(ds: Dataset, comparison: pd.DataFrame, hyp: pd.DataFrame | N
         "",
     ]
     if hyp is not None:
+        e = ds.entries
+        lines += ["## Stichprobe Fragebogen", "", _fmt(ds.entry_flow), "",
+                  "Zuordnung Fragebogen zu Besuch: " + ", ".join(
+                      f"{k}: {v}" for k, v in e["match_status"].value_counts().items()), ""]
+        q = ds.questionnaire
+        desc = q.groupby("variante")[["task_success", "seq_mean", "ueqs_pragmatic", "ueqs_hedonic", "ueqs_total"]].agg(
+            ["count", "mean", "median"]).round(2)
+        desc.columns = [f"{a}_{b}" for a, b in desc.columns]
+        lines += ["## Fragebogen nach Variante", "", _fmt(desc.reset_index()), ""]
         lines += ["## Hypothesen", "", _fmt(hyp), ""]
     else:
         lines += ["## Hypothesen", "", f"Noch keine Fragebogendaten ({QUESTIONNAIRE_FILE.name} fehlt).", ""]

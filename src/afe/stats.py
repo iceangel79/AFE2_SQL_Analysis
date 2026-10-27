@@ -47,6 +47,9 @@ def group_compare(df: pd.DataFrame, value: str, group: str, h: str, a: str, b: s
     n = f"{a}={len(ga)}, {b}={len(gb)}"
     if len(ga) < 2 or len(gb) < 2:
         return _row(h, f"Mann-Whitney {value} nach {group}", n, np.nan, np.nan, note="zu wenig Daten")
+    if ga.nunique() == 1 and gb.nunique() == 1 and ga.iloc[0] == gb.iloc[0]:
+        return _row(h, f"Mann-Whitney {value} nach {group}", n, np.nan, np.nan, 0.0,
+                    f"keine Streuung: alle Werte = {ga.iloc[0]:g} (Decken-/Bodeneffekt)")
     u, p = stats.mannwhitneyu(ga, gb, alternative="two-sided")
     # Effektstärke: Rang-biseriale Korrelation (-1..1, positiv = Gruppe a höher)
     rbc = 2 * u / (len(ga) * len(gb)) - 1
@@ -82,19 +85,19 @@ def r2_compare(df: pd.DataFrame, y: str, base: list[str], extra: list[str], h: s
                 f"R² Maus={m1.rsquared:.3f}, R² Maus+Kontext={m2.rsquared:.3f}")
 
 
-def run_hypotheses(df: pd.DataFrame) -> pd.DataFrame:
-    """df: eingeschlossene Besuche, verknüpft mit Fragebogen."""
-    mouse = ["dir_change_rate", "switch_rate", "pause_share"]
+def run_hypotheses(mouse: pd.DataFrame, quest: pd.DataFrame) -> pd.DataFrame:
+    """mouse: eingeschlossene Besuche mit zugeordnetem Fragebogen (H1, H2, H4, H5).
+    quest: alle eingeschlossenen Fragebogen, auch ohne Aufzeichnung (H3a, H3b)."""
+    mouse_metrics = ["dir_change_rate", "switch_rate", "pause_share"]
     rows = [
-        spearman(df, "dir_change_rate", "ueqs_pragmatic", "H1", "negativ"),
-        spearman(df, "time_to_form_s", "seq_mean", "H2", "positiv"),
-        group_compare(df, "task_success", "variant", "H3a", "OP", "ML"),
-        group_compare(df, "ueqs_total", "variant", "H3b", "OP", "ML"),
-        welch(df, "ueqs_total", "variant", "H3b", "OP", "ML"),
+        spearman(mouse, "dir_change_rate", "ueqs_pragmatic", "H1", "negativ"),
+        spearman(mouse, "time_to_form_s", "seq_mean", "H2", "positiv"),
+        group_compare(quest, "task_success", "variante", "H3a", "OP", "ML"),
+        group_compare(quest, "ueqs_total", "variante", "H3b", "OP", "ML"),
+        welch(quest, "ueqs_total", "variante", "H3b", "OP", "ML"),
+        group_compare(mouse, "aoi_portrait_dwell_ms", "geschlecht", "H4 (explorativ)", "weiblich", "männlich"),
+        r2_compare(mouse, "ueqs_total", mouse_metrics, ["task_success", "seq_mean"], "H5"),
     ]
-    if "geschlecht" in df:
-        rows.append(group_compare(df, "aoi_portrait_dwell_ms", "geschlecht", "H4 (explorativ)", "weiblich", "männlich"))
-    rows.append(r2_compare(df, "ueqs_total", mouse, ["task_success", "seq_mean"], "H5"))
     return pd.DataFrame(rows)
 
 

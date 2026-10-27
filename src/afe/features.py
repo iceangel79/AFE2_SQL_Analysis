@@ -83,6 +83,7 @@ def pageview_features(pv: pd.DataFrame, ev: pd.DataFrame, cfg: StudyConfig) -> p
         r["n_scroll_events"] = len(scrolls)
         r["first_click_ms"] = clicks["t_ms"].min() if len(clicks) else np.nan
         r["first_form_ms"] = forms["t_ms"].min() if len(forms) else np.nan
+        r["last_form_ms"] = forms["t_ms"].max() if len(forms) else np.nan
         r["n_form_events"] = len(forms)
 
         sel = mouse["selector"].fillna("").to_numpy()

@@ -1,12 +1,14 @@
 """Schritt 1: SQL-Dump aus phpMyAdmin in eine lokale SQLite-Datenbank laden.
 
-Datenschutz: Es werden nur die Matomo-Tabellen übernommen, die für die
+Datenschutz: Es werden nur die Matomo- und WPForms-Tabellen übernommen, die für die
 Auswertung nötig sind. Aus log_visit werden nur unkritische Spalten übernommen
-(keine IP, keine Besucher-ID, kein Standort). Der Rohdump bleibt in data/raw/.
+(keine IP, keine Besucher-ID, kein Standort). Aus den WPForms-Einträgen werden
+IP-Adresse, User-Agent und alle E-Mail-Felder entfernt. Der Rohdump bleibt in data/raw/.
 """
 
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 import zlib
@@ -38,9 +40,11 @@ TABLES: dict[str, list[str] | None] = {
         "config_device_brand", "config_device_model", "config_os", "config_os_version",
         "config_resolution", "visitor_localtime", "location_country",
     ],
+    # Fragebogen (WPForms): ohne ip_address, user_agent, user_uuid
+    "wpforms_entries": ["entry_id", "form_id", "fields", "date"],
 }
 
-_PREFIX_RE = re.compile(r"^(?P<prefix>\w*?matomo_)(?P<name>.+)$")
+_PREFIX_RE = re.compile(r"^\w*?(?:matomo_(?P<matomo>.+)|_(?P<wpforms>wpforms_entries))$")
 
 _SQLITE_TYPES = {
     "int": "INTEGER", "bigint": "INTEGER", "smallint": "INTEGER", "tinyint": "INTEGER",
@@ -51,7 +55,19 @@ _SQLITE_TYPES = {
 
 def _strip_prefix(table: str) -> str | None:
     m = _PREFIX_RE.match(table)
-    return m.group("name") if m else None
+    if not m:
+        return None
+    return m.group("matomo") or m.group("wpforms")
+
+
+def strip_email_fields(fields_json: str) -> str:
+    """Entfernt alle E-Mail-Felder (Verlosung) aus dem WPForms-JSON."""
+    try:
+        data = json.loads(fields_json)
+    except (TypeError, json.JSONDecodeError):
+        return fields_json
+    clean = {k: v for k, v in data.items() if not (isinstance(v, dict) and v.get("type") == "email")}
+    return json.dumps(clean, ensure_ascii=False)
 
 
 def import_dump(sql_path: str | Path, db_path: Path = DB_PATH, verbose: bool = True) -> dict[str, int]:
@@ -84,7 +100,12 @@ def import_dump(sql_path: str | Path, db_path: Path = DB_PATH, verbose: bool = T
             idx = [i for i, c in enumerate(cols) if allowed is None or c in allowed]
             names = ", ".join(f'"{cols[i]}"' for i in idx)
             ph = ", ".join("?" for _ in idx)
-            con.executemany(f'INSERT INTO "{dst}" ({names}) VALUES ({ph})', ([r[i] for i in idx] for r in rows))
+            values = [[r[i] for i in idx] for r in rows]
+            if dst == "wpforms_entries":
+                fpos = [cols[i] for i in idx].index("fields")
+                for v in values:
+                    v[fpos] = strip_email_fields(v[fpos])
+            con.executemany(f'INSERT INTO "{dst}" ({names}) VALUES ({ph})', values)
             counts[dst] += len(rows)
 
         _add_decoded_blobs(con)

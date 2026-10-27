@@ -28,9 +28,10 @@ werden kann.
   ML-Besuche zählen deshalb erst ab 27.10., OP-Besuche ab 26.10. (`variant_start` in `config/study.toml`).
 - Zuteilung zur Variante über zwei Hälften der Verteilerliste (keine Randomisierung).
 - Tracking: Matomo On-Premise für WordPress mit Plugin Heatmap & Session Recording.
-- Fragebogendaten kommen per E-Mail (WPForms) und werden manuell in `data/manual/fragebogen.csv`
-  erfasst. Es gibt keine Teilnehmer-ID; die Zuordnung Fragebogen ↔ Besuch erfolgt beim Sichten
-  der Session Recordings (bewusste Entscheidung, als Limitation dokumentiert).
+- Fragebogendaten stehen in `wp_wpforms_entries` (Formular 79 = ML, 118 = OP). Es gibt keine
+  Teilnehmer-ID; die Zuordnung Fragebogen ↔ Besuch erfolgt automatisch über den Zeitpunkt
+  (`forms.py`), Korrekturen in `config/match_overrides.csv`. Zeitstempel von Matomo und WPForms sind UTC.
+- Zwei Stichproben: Fragebogen (H3a, H3b, auch ohne Aufzeichnung) und Maus+Fragebogen (H1, H2, H4, H5).
 
 ## Befehle
 
@@ -53,7 +54,8 @@ src/afe/
   load.py          Dump -> data/processed/afe.sqlite (Whitelist von Tabellen und Spalten)
   clean.py         Seitenaufrufe, Ereignisse, Besuche; Variante; Ausschlussregeln
   features.py      Kennzahlen pro Seitenaufruf und Besuch, AOI
-  questionnaire.py Fragebogen einlesen, UEQ-S/SEQ/Task Success berechnen
+  forms.py         WPForms-Einträge parsen, Antworten bewerten, Besuchen zuordnen, Ausschlüsse
+  questionnaire.py UEQ-S/Schwierigkeit/Task Success berechnen; manuelle CSV als Fallback
   stats.py         Hypothesentests H1-H5, Variantenvergleich
   plots.py         Grafiken
   dom.py           DOM-Snapshots auswerten (AOI-Selektoren prüfen)
@@ -77,6 +79,11 @@ Tabellen (Präfix `wp_matomo_` wird beim Import entfernt):
 | `log_action` | URLs (type 1), Seitentitel (type 4), CSS-Selektoren (type 96) |
 | `log_visit` | Besuch: Browser, OS, Auflösung (nur unkritische Spalten importiert) |
 | `site_hsr`, `log_hsr_site` | Heatmap-/Recording-Konfigurationen und Zuordnung |
+| `wpforms_entries` | Formulareinträge: `entry_id`, `form_id`, `date` (UTC), `fields` (JSON; E-Mail-Felder beim Import entfernt) |
+
+WPForms `fields`: Die Feld-IDs haben sich während der Tests geändert. Felder deshalb immer über die
+Bezeichnung erkennen (siehe `forms._parse_fields`), nicht über die ID. Nach dem Absenden leert WPForms
+das Formular; Matomo zeichnet dabei noch Formularereignisse bis ca. 30 s nach dem Absenden auf.
 
 `event_type`: 1 Bewegung, 2 Klick, 3 Scroll, 4 Resize, 5 initialer DOM, 6 DOM-Mutation,
 9 Formular-Text (maskiert als `****`), 10 Formular-Auswahl, 12 Scroll in Element, 13 CSS.
@@ -99,9 +106,10 @@ Mit `afe.bat images` überprüfbar.
 ### Datenschutz (öffentliches Repo)
 - **Nie** Daten committen: keine `.sql`, `.sqlite`, `.csv` (ausser `config/` und `tests/fixtures/`),
   `.xlsx`, Grafiken mit echten Daten, Notebook-Outputs. `.gitignore` nicht aufweichen.
-- Keine Besuchs-IDs, Zeitstempel, Namen oder E-Mail-Adressen echter Teilnehmender in Code, Kommentare,
-  Commit-Messages, Issues oder Doku schreiben. Ausnahme: `config/exclude_visits.csv` enthält nur IDs mit
-  generischem Grund (z. B. «Test Team»).
+- Keine Besuchs-IDs, Zeitstempel, Namen, Antworten oder E-Mail-Adressen echter Teilnehmender in Code,
+  Kommentare, Commit-Messages, Issues oder Doku schreiben. Ausnahme: `config/exclude_visits.csv`,
+  `config/exclude_entries.csv` und `config/match_overrides.csv` enthalten nur IDs mit generischem Grund.
+- Freitext-Feedback der Teilnehmenden nie in Bericht oder Repo übernehmen.
 - Tests nur mit synthetischen Daten (`tests/fixtures/mini_dump.sql`).
 - `load.py` importiert bewusst keine IP, Besucher-ID oder Standortdaten. Diese Whitelist nicht erweitern,
   ohne Rücksprache.
@@ -131,5 +139,5 @@ Mit `afe.bat images` überprüfbar.
 - Hypothesen in `stats.py` mit der finalen Fassung der Arbeit abgleichen (Stand 21.10.2026:
   H1 auf UEQ-S pragmatische Qualität, H2 mit umgepolter Schwierigkeit).
 - Optional: absolute Koordinaten über Playwright-Rendering der DOM-Snapshots (für Movement Path Entropy).
-- Formulareinträge: Falls die Datenbank WPForms-Einträge enthält, Import ergänzen (ohne E-Mail-Feld)
-  und Zuordnung zum Besuch über den Absendezeitpunkt automatisieren.
+- Bewertung Aufgabe 1: «Prättigau» und «Schiers» gelten beide als richtig (Teamentscheid bestätigen).
+- Deckeneffekt prüfen: In der Feldphase lösen bisher alle Teilnehmenden alle drei Aufgaben (H3a ohne Streuung).

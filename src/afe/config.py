@@ -50,6 +50,11 @@ class StudyConfig:
     variant_start: dict[str, str] = field(default_factory=dict)
     scale_min: int = 1
     scale_max: int = 5
+    form_ids: dict[int, str] = field(default_factory=dict)
+    match_tolerance_s: float = 600
+    match_overrides_file: str = "config/match_overrides.csv"
+    exclude_entries_file: str = "config/exclude_entries.csv"
+    answers: dict[str, list[str]] = field(default_factory=dict)
     exclude_visits_file: str = "config/exclude_visits.csv"
     device_types: list[int] = field(default_factory=list)
     require_form: bool = False
@@ -65,6 +70,14 @@ class StudyConfig:
     def exclude_path(self) -> Path:
         return ROOT / self.exclude_visits_file
 
+    @property
+    def exclude_entries_path(self) -> Path:
+        return ROOT / self.exclude_entries_file
+
+    @property
+    def match_overrides_path(self) -> Path:
+        return ROOT / self.match_overrides_file
+
 
 def load_config(path: Path | None = None) -> StudyConfig:
     raw = tomllib.loads((path or CONFIG_FILE).read_text(encoding="utf-8"))
@@ -76,6 +89,11 @@ def load_config(path: Path | None = None) -> StudyConfig:
         variant_start=dict(s.get("variant_start", {})),
         scale_min=int(raw.get("questionnaire", {}).get("scale_min", 1)),
         scale_max=int(raw.get("questionnaire", {}).get("scale_max", 5)),
+        form_ids={int(k): v for k, v in raw.get("questionnaire", {}).get("form_ids", {}).items()},
+        match_tolerance_s=float(raw.get("questionnaire", {}).get("match_tolerance_s", 600)),
+        match_overrides_file=raw.get("questionnaire", {}).get("match_overrides_file", "config/match_overrides.csv"),
+        exclude_entries_file=raw.get("questionnaire", {}).get("exclude_entries_file", "config/exclude_entries.csv"),
+        answers={k: [w.lower() for w in v] for k, v in raw.get("questionnaire", {}).get("answers", {}).items()},
         exclude_visits_file=s.get("exclude_visits_file", "config/exclude_visits.csv"),
         device_types=list(s.get("device_types", [])),
         require_form=bool(s.get("require_form", False)),
