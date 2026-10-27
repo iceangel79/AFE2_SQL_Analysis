@@ -24,8 +24,10 @@ werden kann.
   - pro Aufgabe: Freitextantwort + Schwierigkeit 1-5 (1 = sehr einfach, 5 = sehr schwierig)
   - UEQ-S, 8 Items, **5-stufig** (Original 7-stufig, daher keine Benchmark-Vergleiche)
   - optional E-Mail (nur Verlosung, wird nie importiert) und Feedback
-- Feldphase ab 26.10.2026. Am 26.10. brach die Aufzeichnung der Menüversion beim Seitenwechsel ab;
-  ML-Besuche zählen deshalb erst ab 27.10., OP-Besuche ab 26.10. (`variant_start` in `config/study.toml`).
+- Feldphase ab 26.10.2026. Am 26.10. zeichnete Matomo in der Menüversion nur die erste Seite auf;
+  ML-Mausdaten zählen deshalb erst ab 27.10., OP ab 26.10. (`variant_start` in `config/study.toml`).
+  Die Fragebogen vom 26.10. sind in beiden Varianten gültig (Teamentscheid 27.10.2026).
+- Aufgabe 1: «Prättigau» und «Schiers» gelten beide als richtig (Teamentscheid 27.10.2026).
 - Zuteilung zur Variante über zwei Hälften der Verteilerliste (keine Randomisierung).
 - Tracking: Matomo On-Premise für WordPress mit Plugin Heatmap & Session Recording.
 - Fragebogendaten stehen in `wp_wpforms_entries` (Formular 79 = ML, 118 = OP). Es gibt keine
@@ -139,5 +141,4 @@ Mit `afe.bat images` überprüfbar.
 - Hypothesen in `stats.py` mit der finalen Fassung der Arbeit abgleichen (Stand 21.10.2026:
   H1 auf UEQ-S pragmatische Qualität, H2 mit umgepolter Schwierigkeit).
 - Optional: absolute Koordinaten über Playwright-Rendering der DOM-Snapshots (für Movement Path Entropy).
-- Bewertung Aufgabe 1: «Prättigau» und «Schiers» gelten beide als richtig (Teamentscheid bestätigen).
 - Deckeneffekt prüfen: In der Feldphase lösen bisher alle Teilnehmenden alle drei Aufgaben (H3a ohne Streuung).

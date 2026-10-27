@@ -10,8 +10,8 @@
 field_start = "2026-10-26"
 field_end = ""
 timezone = "Europe/Zurich"
-# Späterer gültiger Start pro Variante. Am 26.10.2026 brach die Aufzeichnung der
-# Menüversion beim Seitenwechsel ab (Tracking-Problem, am 27.10. behoben).
+# Späterer gültiger Start pro Variante. Am 26.10.2026 zeichnete Matomo in der
+# Menüversion jeweils nur die erste Seite auf (Tracking-Problem, am 27.10. behoben).
 # Daher zählen ML-Besuche erst ab 27.10.; Onepager-Daten sind ab 26.10. gültig.
 variant_start = { ML = "2026-10-27" }
 # Zusätzlich ausgeschlossene Besuche (Tests, Abbrüche usw.) mit Begründung
@@ -45,7 +45,8 @@ exclude_entries_file = "config/exclude_entries.csv"
 # Bewertung der Freitextantworten: Antwort gilt als richtig, wenn sie (ohne Gross-/
 # Kleinschreibung) mindestens einen Begriff enthält. Quelle: Texte der Website.
 # a1: "Aufgewachsen bin ich im Prättigau"; Schiers liegt im Prättigau und wird im
-#     Einleitungstext als Wohnort der Familie genannt -> beide gelten als richtig.
+#     Einleitungstext als Wohnort der Familie genannt -> beide gelten als richtig
+#     (Teamentscheid 27.10.2026).
 # a2: "mit meinem Trainer Andrin Flury"
 # a3: "Gipfelgold Sporternährung"
 [questionnaire.answers]
