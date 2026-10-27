@@ -4,20 +4,23 @@
 
 param([switch]$Recreate)
 
-$ErrorActionPreference = "Stop"
+# Fehler von Python/pip werden ueber $LASTEXITCODE geprueft (pip schreibt Warnungen nach stderr)
+$ErrorActionPreference = "Continue"
 Set-Location -Path $PSScriptRoot
 
 function Find-Python {
-    # Bevorzugt den Python-Launcher "py" mit 3.12, sonst 3.13/3.11, sonst "python"
+    # Bevorzugt den Python-Launcher "py" mit 3.12, sonst 3.13/3.11, sonst "python".
+    # Rueckgabe als Objekt (Exe + Args): PowerShell wuerde ein Array mit nur einem
+    # Element beim return in einen einfachen String umwandeln.
     foreach ($v in @("3.12", "3.13", "3.11")) {
         try {
-            $out = & py "-$v" -c "import sys; print(sys.version)" 2>$null
-            if ($LASTEXITCODE -eq 0) { return @("py", "-$v") }
+            & py "-$v" -c "import sys" 2>$null
+            if ($LASTEXITCODE -eq 0) { return [pscustomobject]@{ Exe = "py"; Args = @("-$v") } }
         } catch { }
     }
     try {
         $ok = & python -c "import sys; print(sys.version_info >= (3, 11))" 2>$null
-        if ($ok -eq "True") { return @("python") }
+        if ($ok -eq "True") { return [pscustomobject]@{ Exe = "python"; Args = @() } }
     } catch { }
     return $null
 }
@@ -34,18 +37,22 @@ if (-not (Test-Path ".venv\Scripts\python.exe")) {
         Write-Host "Bitte Python 3.12 installieren: https://www.python.org/downloads/ (Haken bei 'Add python.exe to PATH' setzen)"
         exit 1
     }
-    Write-Host "Erstelle .venv mit: $($py -join ' ')" -ForegroundColor Cyan
-    $exe = $py[0]
-    $pyArgs = @()
-    if ($py.Length -gt 1) { $pyArgs += $py[1..($py.Length - 1)] }
-    & $exe @pyArgs -m venv .venv
+    $pyArgs = @($py.Args)
+    Write-Host "Erstelle .venv mit: $($py.Exe) $($pyArgs -join ' ')" -ForegroundColor Cyan
+    & $py.Exe @pyArgs -m venv .venv
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path ".venv\Scripts\python.exe")) {
+        Write-Host "Erstellen der .venv fehlgeschlagen." -ForegroundColor Red
+        exit 1
+    }
 }
 
 $venvPy = ".venv\Scripts\python.exe"
 Write-Host "Installiere Pakete ..." -ForegroundColor Cyan
 & $venvPy -m pip install --upgrade pip --quiet
 & $venvPy -m pip install -r requirements.txt --quiet
+if ($LASTEXITCODE -ne 0) { Write-Host "Installation der Pakete fehlgeschlagen." -ForegroundColor Red; exit 1 }
 & $venvPy -m pip install -e . --quiet
+if ($LASTEXITCODE -ne 0) { Write-Host "Installation des Projekts fehlgeschlagen." -ForegroundColor Red; exit 1 }
 
 Write-Host "Registriere Jupyter-Kernel 'afe' ..." -ForegroundColor Cyan
 & $venvPy -m ipykernel install --user --name afe --display-name "Python (AFE)" | Out-Null
