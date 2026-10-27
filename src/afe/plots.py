@@ -83,24 +83,27 @@ def page_paths(pv: pd.DataFrame, visits: pd.DataFrame, out: Path) -> Path:
     return path
 
 
-def image_usage(summary: pd.DataFrame, out: Path) -> Path | None:
-    """Anteil Besuche, die ein Bild überfahren bzw. angeklickt haben, je Variante."""
+def image_usage(summary: pd.DataFrame, out: Path, by: str = "variant",
+                groups: tuple[str, ...] = ("ML", "OP"), name: str = "bilder_nutzung") -> Path | None:
+    """Anteil Besuche, die ein Bild überfahren bzw. angeklickt haben, je Gruppe."""
     if summary.empty:
         return None
+    colors = {"ML": COLORS["ML"], "OP": COLORS["OP"], "weiblich": "#E69F00", "männlich": "#0072B2"}
     order = (summary.groupby("image")["anteil_ueberfahren"].mean().sort_values().index.tolist())
     fig, axes = plt.subplots(1, 2, figsize=(9, 0.45 * len(order) + 1.5), sharey=True)
     for ax, col, title in zip(axes, ["anteil_ueberfahren", "anteil_angeklickt"], ["überfahren", "angeklickt (Vergrösserung)"]):
-        for i, v in enumerate(("ML", "OP")):
-            d = summary[summary["variant"] == v].set_index("image").reindex(order)
+        for i, v in enumerate(groups):
+            d = summary[summary[by] == v].set_index("image").reindex(order)
             y = [k + (i - 0.5) * 0.38 for k in range(len(order))]
-            ax.barh(y, d[col].fillna(0), height=0.36, color=COLORS[v], alpha=0.75, label=v)
+            n = int(d["besuche_mit_bild"].max()) if d["besuche_mit_bild"].notna().any() else 0
+            ax.barh(y, d[col].fillna(0), height=0.36, color=colors.get(v, "grey"), alpha=0.8, label=f"{v} (n≤{n})")
         ax.set_yticks(range(len(order)), [o.replace("-Mira-Caduff", "") for o in order])
         ax.set_xlim(0, 1)
         ax.xaxis.set_major_formatter(matplotlib.ticker.PercentFormatter(1.0))
         ax.set_title(f"Anteil Besuche: {title}")
     axes[0].legend(loc="lower right")
     fig.tight_layout()
-    path = out / "bilder_nutzung.png"
+    path = out / f"{name}.png"
     fig.savefig(path)
     plt.close(fig)
     return path

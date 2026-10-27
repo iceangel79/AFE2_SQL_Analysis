@@ -225,12 +225,13 @@ def visit_image_usage(ev: pd.DataFrame, pv: pd.DataFrame, cfg: StudyConfig) -> p
     }).reset_index()
 
 
-def image_summary(usage: pd.DataFrame, visits: pd.DataFrame, pv: pd.DataFrame,
-                  page_imgs: dict[str, set[str]]) -> pd.DataFrame:
-    """Pro Variante und Bild: wie viele Besuche hatten das Bild auf einer besuchten Seite,
-    wie viele haben es überfahren bzw. angeklickt (Vergrösserung)?
+def image_availability(usage: pd.DataFrame, visits: pd.DataFrame, pv: pd.DataFrame,
+                       page_imgs: dict[str, set[str]]) -> pd.DataFrame:
+    """Eine Zeile pro Besuch und Bild, das auf einer besuchten Seite stand.
 
-    visits: nur eingeschlossene Besuche."""
+    Spalten: idvisit, variant, image, hovered, clicked, hover_ms (0 wenn nie überfahren).
+    visits: nur eingeschlossene Besuche. Basis für alle Bild-Auswertungen, damit z. B. in der
+    Menüversion nur Besuche zählen, die die Unterseite mit dem Bild überhaupt aufgerufen haben."""
     avail = (pv[pv["idvisit"].isin(visits["idvisit"])]
              .assign(images=lambda d: d["url"].map(lambda u: sorted(page_imgs.get(u, set()))))
              .explode("images").dropna(subset=["images"])
@@ -239,7 +240,13 @@ def image_summary(usage: pd.DataFrame, visits: pd.DataFrame, pv: pd.DataFrame,
     d = avail.merge(usage, on=["idvisit", "image"], how="left")
     d["hovered"] = d["events"].fillna(0) > 0
     d["clicked"] = d["clicked"].fillna(False).astype(bool)
-    g = d.groupby(["variant", "image"])
+    d["hover_ms"] = d["hover_ms"].fillna(0.0)
+    return d.drop(columns=["events"])
+
+
+def image_summary(avail: pd.DataFrame, by: str = "variant") -> pd.DataFrame:
+    """Pro Gruppe (Variante oder Geschlecht) und Bild: Anteil überfahren/angeklickt, Verweildauer."""
+    g = avail.groupby([by, "image"])
     out = pd.DataFrame({
         "besuche_mit_bild": g.size(),
         "ueberfahren": g["hovered"].sum(),

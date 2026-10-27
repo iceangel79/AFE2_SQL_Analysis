@@ -115,7 +115,9 @@ Ohne WPForms-Tabelle im Dump kann der Fragebogen weiterhin manuell erfasst werde
 
 Bilder werden erkannt, indem der CSS-Selektor jedes Mausereignisses im gespeicherten
 DOM-Snapshot der Seite aufgelöst wird (`dom.py`). Der Bericht enthält pro Bild und Variante
-den Anteil Besuche, die es überfahren bzw. angeklickt haben (`afe.bat images` zeigt alle Bilder).
+und Geschlecht den Anteil Besuche, die es überfahren bzw. angeklickt haben, sowie explorative
+Tests je Bild (Fisher bzw. Mann-Whitney, Holm-korrigiert je Testfamilie). Basis sind nur Besuche,
+die eine Seite mit dem Bild aufgerufen haben (`afe.bat images` zeigt alle Bilder).
 
 **Einschränkung:** Matomo speichert Mauspositionen relativ zum Element unter der Maus
 (skaliert auf 0–2000), nicht in Bildschirmpixeln. Absolute Pfadlängen oder eine

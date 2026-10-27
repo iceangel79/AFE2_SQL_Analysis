@@ -26,3 +26,13 @@ def test_select_nth_child_and_class():
     assert len(n) == 1 and image_for_node(n[0]) == "Portrait-X"
     # Element mit zwei Bildern darunter ist nicht eindeutig
     assert image_for_node(idx.select("article#post-1")[0]) is None
+
+
+def test_holm():
+    import pandas as pd
+    from afe.stats import holm
+
+    p = pd.Series([0.01, 0.04, None, 0.03])
+    adj = holm(p)
+    assert round(adj[0], 3) == 0.03 and round(adj[3], 3) == 0.06 and round(adj[1], 3) == 0.06
+    assert pd.isna(adj[2])

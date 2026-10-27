@@ -75,7 +75,10 @@ def welch(df: pd.DataFrame, value: str, group: str, h: str, a: str, b: str) -> d
 
 def fisher(df: pd.DataFrame, flag: str, group: str, h: str, a: str, b: str) -> dict:
     d = df[df[group].isin([a, b])].dropna(subset=[flag])
-    if d[group].nunique() < 2:
+    if d[group].nunique() < 2 or d[flag].nunique() < 2:
+        if d[group].nunique() == 2 and d[flag].nunique() == 1:
+            return _row(h, f"Fisher {flag} nach {group}", f"{a}={int((d[group] == a).sum())}, {b}={int((d[group] == b).sum())}",
+                        np.nan, np.nan, note=f"keine Streuung: alle {'ja' if bool(d[flag].iloc[0]) else 'nein'}")
         return _row(h, f"Fisher {flag} nach {group}", len(d), np.nan, np.nan, note="zu wenig Daten")
     tab = pd.crosstab(d[group], d[flag].astype(bool)).reindex(index=[a, b], columns=[True, False], fill_value=0)
     odds, p = stats.fisher_exact(tab.to_numpy())
@@ -132,3 +135,59 @@ def compare_variants(visits: pd.DataFrame, metrics: dict[str, str]) -> pd.DataFr
         rows.append(r)
     out = pd.DataFrame(rows).rename(columns={"hypothese": "kennzahl"})
     return out
+
+
+def holm(p: pd.Series) -> pd.Series:
+    """Holm-Bonferroni-Korrektur (NaN bleibt NaN)."""
+    valid = p.dropna().sort_values()
+    m = len(valid)
+    adj, running = {}, 0.0
+    for i, (idx, val) in enumerate(valid.items()):
+        running = max(running, min(1.0, (m - i) * val))
+        adj[idx] = running
+    return p.index.to_series().map(adj).astype(float)
+
+
+def image_tests(avail: pd.DataFrame) -> pd.DataFrame:
+    """Explorative Tests je Bild (alle Inhaltsbilder, nicht nur das Porträt).
+
+    avail: Besuch x Bild (features.image_availability), optional mit Spalte geschlecht.
+    Familien (je mit Holm-Korrektur über die Bilder):
+    - überfahren nach Variante (Fisher), angeklickt nach Variante (Fisher)
+    - überfahren nach Geschlecht (Fisher), Verweildauer nach Geschlecht (Mann-Whitney)
+    """
+    families = [
+        ("überfahren nach Variante", lambda d, img: fisher(d, "hovered", "variant", img, "OP", "ML")),
+        ("angeklickt nach Variante", lambda d, img: fisher(d, "clicked", "variant", img, "OP", "ML")),
+    ]
+    if "geschlecht" in avail:
+        families += [
+            ("überfahren nach Geschlecht", lambda d, img: fisher(d, "hovered", "geschlecht", img, "weiblich", "männlich")),
+            ("angeklickt nach Geschlecht", lambda d, img: fisher(d, "clicked", "geschlecht", img, "weiblich", "männlich")),
+            ("Verweildauer nach Geschlecht", lambda d, img: group_compare(d, "hover_ms", "geschlecht", img, "weiblich", "männlich")),
+        ]
+    rows = []
+    for fam, fn in families:
+        part = []
+        for img, d in avail.groupby("image"):
+            r = fn(d, img.replace("-Mira-Caduff", ""))
+            r["familie"] = fam
+            part.append(r)
+        part = pd.DataFrame(part)
+        part["p_holm"] = holm(part["p"])
+        part["signifikant"] = part["p_holm"] < ALPHA
+        rows.append(part)
+    # Zusammengefasst: mindestens ein Bild angeklickt (ein Test statt acht, keine Korrektur nötig)
+    per_visit = avail.groupby("idvisit").agg(variant=("variant", "first"), clicked=("clicked", "any"))
+    if "geschlecht" in avail:
+        per_visit["geschlecht"] = avail.groupby("idvisit")["geschlecht"].first()
+    summary = [fisher(per_visit, "clicked", "variant", "alle Bilder", "OP", "ML") | {"familie": "mind. ein Bild angeklickt"}]
+    if "geschlecht" in per_visit:
+        summary.append(fisher(per_visit, "clicked", "geschlecht", "alle Bilder", "weiblich", "männlich")
+                       | {"familie": "mind. ein Bild angeklickt"})
+    summary = pd.DataFrame(summary)
+    summary["p_holm"] = summary["p"]
+    summary["signifikant"] = summary["p"] < ALPHA
+    rows.insert(0, summary)
+    out = pd.concat(rows, ignore_index=True).rename(columns={"hypothese": "bild"})
+    return out[["familie", "bild", "test", "n", "statistik", "p", "p_holm", "effekt", "signifikant", "hinweis"]]

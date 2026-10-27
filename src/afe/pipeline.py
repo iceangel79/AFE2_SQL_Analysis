@@ -104,7 +104,13 @@ def report(ds: Dataset | None = None) -> None:
     inc = ds.included
 
     comparison = stats.compare_variants(inc, features.KEY_METRICS)
-    img_summary = features.image_summary(ds.image_usage, inc, ds.pageviews, ds.page_images)
+    avail = features.image_availability(ds.image_usage, inc, ds.pageviews, ds.page_images)
+    if ds.entries is not None:
+        gender = ds.entries.loc[ds.entries["mouse_included"], ["idvisit", "geschlecht"]].dropna().drop_duplicates("idvisit")
+        avail = avail.merge(gender, on="idvisit", how="left")
+    img_summary = features.image_summary(avail, "variant")
+    img_gender = features.image_summary(avail.dropna(subset=["geschlecht"]), "geschlecht") if "geschlecht" in avail else None
+    img_tests = stats.image_tests(avail)
     sel = features.selector_summary(ds.events[ds.events["included"].fillna(False).astype(bool)])
 
     hyp = None
@@ -113,9 +119,11 @@ def report(ds: Dataset | None = None) -> None:
         hyp = stats.run_hypotheses(merged, ds.questionnaire)
 
     figs = [plots.boxplots(inc, features.KEY_METRICS, fig_dir), plots.page_paths(ds.pageviews, ds.visits, fig_dir)]
-    f = plots.image_usage(img_summary, fig_dir)
-    if f:
-        figs.append(f)
+    for f in (plots.image_usage(img_summary, fig_dir),
+              plots.image_usage(img_gender, fig_dir, "geschlecht", ("weiblich", "männlich"), "bilder_geschlecht")
+              if img_gender is not None else None):
+        if f:
+            figs.append(f)
     inc_ev = ds.events[ds.events["included"].fillna(False).astype(bool)]
     if "aoi_portrait" in inc_ev:
         f = plots.aoi_hover_map(inc_ev, "aoi_portrait", fig_dir, "Mauspositionen auf dem Porträt")
@@ -125,7 +133,10 @@ def report(ds: Dataset | None = None) -> None:
     with pd.ExcelWriter(OUTPUT / "tabellen.xlsx") as xw:
         ds.flow.to_excel(xw, sheet_name="Stichprobe", index=False)
         comparison.to_excel(xw, sheet_name="Variantenvergleich", index=False)
-        img_summary.to_excel(xw, sheet_name="Bilder", index=False)
+        img_summary.to_excel(xw, sheet_name="Bilder nach Variante", index=False)
+        if img_gender is not None:
+            img_gender.to_excel(xw, sheet_name="Bilder nach Geschlecht", index=False)
+        img_tests.to_excel(xw, sheet_name="Bilder Tests", index=False)
         inc.to_excel(xw, sheet_name="Besuche", index=False)
         sel.head(500).to_excel(xw, sheet_name="Elemente", index=False)
         if hyp is not None:
@@ -134,7 +145,7 @@ def report(ds: Dataset | None = None) -> None:
             ds.entries.drop(columns=["feedback"], errors="ignore").to_excel(xw, sheet_name="Fragebogen", index=False)
             merged.to_excel(xw, sheet_name="Besuche+Fragebogen", index=False)
 
-    _write_markdown(ds, comparison, hyp, figs, img_summary)
+    _write_markdown(ds, comparison, hyp, figs, img_summary, img_gender, img_tests)
     print(f"Bericht: {OUTPUT / 'bericht.md'}")
     print(f"Tabellen: {OUTPUT / 'tabellen.xlsx'}")
 
@@ -152,7 +163,7 @@ def _has_tabulate() -> bool:
 
 
 def _write_markdown(ds: Dataset, comparison: pd.DataFrame, hyp: pd.DataFrame | None, figs: list,
-                    img_summary: pd.DataFrame) -> None:
+                    img_summary: pd.DataFrame, img_gender: pd.DataFrame | None, img_tests: pd.DataFrame) -> None:
     cfg = ds.cfg
     lines = [
         "# AFE2 Auswertung",
@@ -186,6 +197,13 @@ def _write_markdown(ds: Dataset, comparison: pd.DataFrame, hyp: pd.DataFrame | N
             ["variant", "image", "besuche_mit_bild", "anteil_ueberfahren", "anteil_angeklickt", "median_ms_wenn_ueberfahren"]]),
         "",
     ]
+    if img_gender is not None:
+        lines += ["Nach Geschlecht (nur Besuche mit zugeordnetem Fragebogen):", "",
+                  _fmt(img_gender.assign(image=img_gender["image"].str.replace("-Mira-Caduff", "", regex=False))[
+                      ["geschlecht", "image", "besuche_mit_bild", "anteil_ueberfahren", "anteil_angeklickt",
+                       "median_ms_wenn_ueberfahren"]]), ""]
+    lines += ["### Tests je Bild (explorativ, Holm-korrigiert je Familie)", "",
+              _fmt(img_tests[["familie", "bild", "n", "p", "p_holm", "effekt", "hinweis"]]), ""]
     if hyp is not None:
         e = ds.entries
         lines += ["## Stichprobe Fragebogen", "", _fmt(ds.entry_flow), "",

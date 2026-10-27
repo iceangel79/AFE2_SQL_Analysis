@@ -144,4 +144,6 @@ Besuche mit Selektoren `wp-admin-bar` stammen von eingeloggten Admins und werden
 - Hypothesen in `stats.py` mit der finalen Fassung der Arbeit abgleichen (Stand 21.10.2026:
   H1 auf UEQ-S pragmatische Qualität, H2 mit umgepolter Schwierigkeit).
 - Optional: absolute Koordinaten über Playwright-Rendering der DOM-Snapshots (für Movement Path Entropy).
+- Bilder: Auswertung umfasst alle 8 Inhaltsbilder, nicht nur das Porträt. Bei Vergleichen nach Geschlecht
+  die Verteilung Geschlecht x Variante beachten (Konfundierung, z. B. Klicks nur in der Menüversion).
 - Deckeneffekt prüfen: In der Feldphase lösen bisher alle Teilnehmenden alle drei Aufgaben (H3a ohne Streuung).
