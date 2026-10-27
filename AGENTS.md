@@ -115,6 +115,9 @@ Besuche mit Selektoren `wp-admin-bar` stammen von eingeloggten Admins und werden
   Kommentare, Commit-Messages, Issues oder Doku schreiben. Ausnahme: `config/exclude_visits.csv`,
   `config/exclude_entries.csv` und `config/match_overrides.csv` enthalten nur IDs mit generischem Grund.
 - Freitext-Feedback der Teilnehmenden nie in Bericht oder Repo übernehmen.
+- E-Mail-Adressen nur in `raffle.py` (Verlosung) verwenden: direkt aus dem Rohdump lesen, nur in
+  `output/verlosung.xlsx` schreiben. Nie in die SQLite-DB, Analyse-CSVs, Bericht oder Konsolen-Logs
+  ausser der Gewinnerliste.
 - Tests nur mit synthetischen Daten (`tests/fixtures/mini_dump.sql`).
 - `load.py` importiert bewusst keine IP, Besucher-ID oder Standortdaten. Diese Whitelist nicht erweitern,
   ohne Rücksprache.

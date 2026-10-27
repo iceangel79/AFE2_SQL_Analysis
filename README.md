@@ -57,6 +57,7 @@ Bei Problemen die Umgebung neu aufbauen: `powershell -ExecutionPolicy Bypass -Fi
 | `afe.bat images` | Bilder je Seite mit DOM-Position (AOI prüfen) |
 | `afe.bat selectors --page startseite` | meistbenutzte Elemente einer Seite |
 | `afe.bat notebook` | Jupyter Lab für explorative Analysen |
+| `afe.bat verlosung` | Wettbewerb: E-Mail-Liste und Ziehung von 3 Gewinnern nach `output\verlosung.xlsx` |
 | `afe.bat strip` | Notebook-Outputs löschen (vor jedem Commit) |
 | `.venv\Scripts\python -m pytest` | Tests |
 
@@ -96,6 +97,17 @@ Werte sind daher nicht mit den UEQ-Benchmarks vergleichbar.
 
 Ohne WPForms-Tabelle im Dump kann der Fragebogen weiterhin manuell erfasst werden
 (`config\templates\fragebogen_vorlage.csv` nach `data\manual\fragebogen.csv` kopieren, mit `idvisit` und `variante`).
+
+## Verlosung
+
+`afe.bat verlosung` liest die E-Mail-Adressen direkt aus dem SQL-Dump (sie gelangen nie in die
+Analyse-Datenbank oder ins Repo) und schreibt `output\verlosung.xlsx` mit den Blättern
+*Gewinner*, *Teilnehmende* und *Protokoll*.
+
+- Berechtigt: Einträge ab Feldstart mit gültiger E-Mail-Adresse, eine Chance pro Adresse.
+- Die Ziehung verwendet einen zufälligen Seed, der im Protokoll steht (nachvollziehbar).
+- Ein zweiter Aufruf überschreibt die Ziehung nicht; neu ziehen nur mit `--neu`.
+- Nach Abschluss der Verlosung die Datei löschen (Zusage in der Einladung).
 
 ## Kennzahlen
 

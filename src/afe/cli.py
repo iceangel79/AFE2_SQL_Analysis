@@ -85,6 +85,20 @@ def cmd_selectors(a) -> None:
     print(s.head(a.top).to_string(index=False))
 
 
+def cmd_raffle(a) -> None:
+    from .config import load_config
+    from .raffle import RESULT_FILE, run
+
+    dump = Path(a.dump) if a.dump else _latest_dump()
+    try:
+        winners = run(dump, load_config(), n=a.anzahl, prize=a.preis, seed=a.seed, new=a.neu)
+    except FileExistsError as e:
+        sys.exit(str(e))
+    print(f"Ziehung aus {dump.name}:")
+    print(winners[["rang", "email", "preis"]].to_string(index=False))
+    print(f"Gespeichert: {RESULT_FILE}  (Teilnehmende, Gewinner, Protokoll mit Seed)")
+
+
 def cmd_strip(a) -> None:
     """Löscht Outputs aller Notebooks (sonst landen Daten im öffentlichen Repo)."""
     import json
@@ -126,6 +140,14 @@ def main(argv: list[str] | None = None) -> None:
     s.add_argument("--page", help="z. B. startseite, one-pager, kontakt")
     s.add_argument("--top", type=int, default=30)
     s.set_defaults(func=cmd_selectors)
+
+    s = sub.add_parser("verlosung", help="Verlosung: E-Mail-Liste und Ziehung nach output/verlosung.xlsx")
+    s.add_argument("dump", nargs="?")
+    s.add_argument("--anzahl", type=int, default=3, help="Anzahl Gewinner (Standard 3)")
+    s.add_argument("--preis", default="CHF 50")
+    s.add_argument("--seed", type=int, help="Seed vorgeben (z. B. um eine Ziehung nachzuvollziehen)")
+    s.add_argument("--neu", action="store_true", help="Bestehende Ziehung überschreiben")
+    s.set_defaults(func=cmd_raffle)
 
     sub.add_parser("strip", help="Outputs aus allen Notebooks löschen (vor jedem Commit)").set_defaults(func=cmd_strip)
 
