@@ -4,10 +4,16 @@
 # nachvollziehbar und kann im Methodenteil der Arbeit zitiert werden.
 
 [sample]
-# Erster und letzter Tag der Feldphase (ISO-Datum, inklusive, Serverzeit UTC).
+# Erster und letzter Tag der Feldphase (ISO-Datum, inklusive, Lokalzeit gemäss timezone).
 # Leer = keine Datumsgrenze (die Pipeline warnt dann).
-field_start = ""
+# Feldstart 26.10.2026 (Versand der Einladungen); alles davor sind Alpha-/Beta-Tests.
+field_start = "2026-10-26"
 field_end = ""
+timezone = "Europe/Zurich"
+# Späterer gültiger Start pro Variante. Am 26.10.2026 brach die Aufzeichnung der
+# Menüversion beim Seitenwechsel ab (Tracking-Problem, am 27.10. behoben).
+# Daher zählen ML-Besuche erst ab 27.10.; Onepager-Daten sind ab 26.10. gültig.
+variant_start = { ML = "2026-10-27" }
 # Zusätzlich ausgeschlossene Besuche (Tests, Abbrüche usw.) mit Begründung
 exclude_visits_file = "config/exclude_visits.csv"
 # Nur diese Gerätetypen auswerten (Matomo device_type: 1 = Desktop, 2 = Tablet, 3 = Smartphone).
@@ -17,6 +23,12 @@ device_types = [1]
 require_form = false
 # Mindestdauer eines Besuchs in Sekunden (0 = keine Grenze), filtert Kurzbesuche/Abbrüche
 min_total_s = 0
+
+[questionnaire]
+# Alle Skalen im WPForms-Fragebogen sind 5-stufig (UEQ-S-Items und Schwierigkeit).
+# Abweichung vom Original-UEQ-S (7-stufig): Werte sind nicht mit den UEQ-Benchmarks vergleichbar.
+scale_min = 1
+scale_max = 5
 
 [variants]
 # Zuordnung eines Besuchs zur Variante anhand der URLs seiner Seitenaufrufe

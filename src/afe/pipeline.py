@@ -62,7 +62,7 @@ def report(ds: Dataset | None = None) -> None:
     comparison = stats.compare_variants(inc, features.KEY_METRICS)
     sel = features.selector_summary(ds.events[ds.events["included"].fillna(False).astype(bool)])
 
-    q = load_questionnaire()
+    q = load_questionnaire(cfg=ds.cfg)
     hyp = None
     merged = None
     if q is not None:
@@ -114,7 +114,9 @@ def _write_markdown(ds: Dataset, comparison: pd.DataFrame, hyp: pd.DataFrame | N
         "",
         "## Einstellungen",
         "",
-        f"- Feldphase: {cfg.field_start or 'nicht gesetzt'} bis {cfg.field_end or 'offen'}",
+        f"- Feldphase: {cfg.field_start or 'nicht gesetzt'} bis {cfg.field_end or 'offen'} ({cfg.timezone})",
+        f"- Späterer Start je Variante: {cfg.variant_start or 'keiner'}",
+        f"- Fragebogen-Skalen: {cfg.scale_min} bis {cfg.scale_max}",
         f"- Geräte: {cfg.device_types or 'alle'}",
         f"- Nur mit Formular: {'ja' if cfg.require_form else 'nein'}, Mindestdauer: {cfg.min_total_s:g} s",
         f"- Richtungswechsel ab {cfg.direction_min_delta} Element-Einheiten, Pause ab {cfg.pause_ms} ms, "

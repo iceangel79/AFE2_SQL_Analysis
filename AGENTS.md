@@ -19,7 +19,13 @@ werden kann.
   - **OP** (Onepager): `eagle-wings.ch/one-pager/`, Fragebogen direkt auf der Seite eingebettet
 - Inhalt: Profil der Mountainbikerin «Mira Caduff» mit Porträt (AOI)
 - Teilnehmende lösen drei Suchaufgaben (Herkunft, Trainer, Sporternährung) und füllen danach den
-  Fragebogen aus (Aufgabenantworten, Schwierigkeit pro Aufgabe, UEQ-S, Demografie). Ziel: max. ca. 50 Personen.
+  Fragebogen aus. Ziel: max. ca. 50 Personen. Fragebogen (WPForms):
+  - Demografie: Geschlecht (männlich, weiblich, keine Angabe), Altersgruppe
+  - pro Aufgabe: Freitextantwort + Schwierigkeit 1-5 (1 = sehr einfach, 5 = sehr schwierig)
+  - UEQ-S, 8 Items, **5-stufig** (Original 7-stufig, daher keine Benchmark-Vergleiche)
+  - optional E-Mail (nur Verlosung, wird nie importiert) und Feedback
+- Feldphase ab 26.10.2026. Am 26.10. brach die Aufzeichnung der Menüversion beim Seitenwechsel ab;
+  ML-Besuche zählen deshalb erst ab 27.10., OP-Besuche ab 26.10. (`variant_start` in `config/study.toml`).
 - Zuteilung zur Variante über zwei Hälften der Verteilerliste (keine Randomisierung).
 - Tracking: Matomo On-Premise für WordPress mit Plugin Heatmap & Session Recording.
 - Fragebogendaten kommen per E-Mail (WPForms) und werden manuell in `data/manual/fragebogen.csv`
@@ -120,9 +126,10 @@ Mit `afe.bat images` überprüfbar.
 
 ## Offene Punkte
 
-- `field_start` in `config/study.toml` setzen (Feldstart) und Testbesuche in `exclude_visits.csv` eintragen.
+- Einzelne Testbesuche während der Feldphase in `exclude_visits.csv` eintragen (z. B. WordPress-Customizer-Vorschau).
 - Entscheiden, ob nur Besuche mit Formular zählen (`require_form`) und ob es eine Mindestdauer gibt.
 - Hypothesen in `stats.py` mit der finalen Fassung der Arbeit abgleichen (Stand 21.10.2026:
   H1 auf UEQ-S pragmatische Qualität, H2 mit umgepolter Schwierigkeit).
 - Optional: absolute Koordinaten über Playwright-Rendering der DOM-Snapshots (für Movement Path Entropy).
-- Spalten der Fragebogenvorlage mit dem WPForms-Formular abgleichen.
+- Formulareinträge: Falls die Datenbank WPForms-Einträge enthält, Import ergänzen (ohne E-Mail-Feld)
+  und Zuordnung zum Besuch über den Absendezeitpunkt automatisieren.

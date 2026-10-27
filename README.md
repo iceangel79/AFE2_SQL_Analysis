@@ -63,7 +63,8 @@ Bei Problemen die Umgebung neu aufbauen: `powershell -ExecutionPolicy Bypass -Fi
 
 Alle Entscheidungen der Auswertung stehen in **`config/study.toml`**, nicht im Code:
 
-- Feldphase (`field_start`, `field_end`): alles davor gilt als Testdaten
+- Feldphase (`field_start`, `field_end`, Lokalzeit): alles davor gilt als Testdaten;
+  `variant_start` erlaubt einen späteren Start pro Variante (ML ab 27.10.2026, siehe Kommentar)
 - `config/exclude_visits.csv`: einzelne Besuche mit Begründung ausschliessen
 - Gerätetypen (Standard: nur Desktop, da Maus-Tracking)
 - Optional: nur Besuche mit Formular, Mindestdauer
@@ -80,7 +81,9 @@ Die Antworten aus WPForms (E-Mail) werden manuell erfasst:
 1. `config\templates\fragebogen_vorlage.csv` nach `data\manual\fragebogen.csv` kopieren.
 2. Pro Teilnehmenden eine Zeile; die `idvisit` beim Sichten der Session Recording in
    Matomo ablesen (`afe.bat info` hilft beim Zuordnen über Zeitpunkt und Variante).
-3. Skalen: `ueq1`–`ueq8` und `seq1`–`seq3` als Rohwerte 1–7, `a1_korrekt`–`a3_korrekt` als 0/1.
+3. Skalen: `ueq1`–`ueq8` und `seq1`–`seq3` als Rohwerte 1–5 (wie im Formular),
+   `a1_korrekt`–`a3_korrekt` als 0/1, `geschlecht` als `männlich`, `weiblich` oder `keine Angabe`.
+   Die E-Mail-Adresse für die Verlosung nicht übertragen.
 
 Sobald die Datei existiert, rechnet `afe.bat report` die Hypothesentests mit.
 

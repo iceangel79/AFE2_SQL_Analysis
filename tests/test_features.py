@@ -53,9 +53,32 @@ def test_pipeline_on_fixture(db, cfg):
 
 def test_ueqs_scoring():
     q = pd.DataFrame({
-        "idvisit": [1], **{f"ueq{i}": [7] for i in range(1, 5)}, **{f"ueq{i}": [1] for i in range(5, 9)},
+        "idvisit": [1], **{f"ueq{i}": [5] for i in range(1, 5)}, **{f"ueq{i}": [1] for i in range(5, 9)},
         "seq1": [1], "seq2": [2], "seq3": [3], "a1_korrekt": [1], "a2_korrekt": [1], "a3_korrekt": [0],
     })
-    s = score(q).iloc[0]
-    assert s["ueqs_pragmatic"] == 3 and s["ueqs_hedonic"] == -3 and s["ueqs_total"] == 0
+    s = score(q, 1, 5).iloc[0]
+    assert s["ueqs_pragmatic"] == 2 and s["ueqs_hedonic"] == -2 and s["ueqs_total"] == 0
     assert s["seq_mean"] == 2 and s["task_success"] == 2
+
+
+def test_questionnaire_validation(tmp_path, cfg):
+    import pytest
+    from afe.questionnaire import load_questionnaire
+
+    f = tmp_path / "fb.csv"
+    f.write_text("idvisit,ueq1,a1_korrekt\n1,6,1\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="ueq1"):
+        load_questionnaire(f, cfg)
+    f.write_text("idvisit,ueq1,a1_korrekt\n1,5,2\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="a1_korrekt"):
+        load_questionnaire(f, cfg)
+
+
+def test_variant_specific_start_and_local_time(db, cfg):
+    cfg.variant_start = {"ML": "2026-11-03"}
+    pv = clean.load_pageviews(db, cfg)
+    v = clean.build_visits(db, pv, cfg).set_index("idvisit")
+    assert v.loc[10, "exclusion"] == "vor gültigem Start ML"
+    assert v.loc[11, "included"]
+    # 10:00 UTC = 11:00 Lokalzeit (Winterzeit)
+    assert v.loc[10, "start_local"].hour == 11

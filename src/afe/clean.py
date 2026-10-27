@@ -95,6 +95,10 @@ def build_visits(con: sqlite3.Connection, pv: pd.DataFrame, cfg: StudyConfig) ->
     })
     visits["variant"] = pd.Series({v: classify_variant(p) for v, p in g})
     visits["device"] = visits["device_type"].map(DEVICE_TYPES).fillna("andere")
+    # Matomo speichert server_time in UTC; Datumsgrenzen gelten in Lokalzeit
+    visits["start_local"] = (
+        visits["start"].dt.tz_localize("UTC").dt.tz_convert(cfg.timezone).dt.tz_localize(None)
+    )
     visits = visits.reset_index()
 
     # Zusatzinfos aus log_visit (falls im Dump enthalten)
@@ -126,12 +130,15 @@ def _exclusion_reasons(visits: pd.DataFrame, cfg: StudyConfig) -> pd.Series:
     manual = _read_exclusions(cfg)
     if manual:
         mark(visits["idvisit"].isin(manual), "manuell ausgeschlossen (exclude_visits.csv)")
+    local = visits["start_local"]
     if cfg.field_start:
-        mark(visits["start"] < pd.Timestamp(cfg.field_start), "vor Feldstart")
+        mark(local < pd.Timestamp(cfg.field_start), "vor Feldstart")
     else:
         warnings.warn("field_start ist nicht gesetzt: Testdaten vor Feldstart werden nicht ausgeschlossen.")
+    for variant, day in cfg.variant_start.items():
+        mark(visits["variant"].eq(variant) & (local < pd.Timestamp(day)), f"vor gültigem Start {variant}")
     if cfg.field_end:
-        mark(visits["start"] >= pd.Timestamp(cfg.field_end) + pd.Timedelta(days=1), "nach Feldende")
+        mark(local >= pd.Timestamp(cfg.field_end) + pd.Timedelta(days=1), "nach Feldende")
     if cfg.device_types:
         mark(~visits["device_type"].isin(cfg.device_types), "Gerät ausgeschlossen")
     mark(visits["variant"].eq("gemischt"), "beide Varianten besucht")

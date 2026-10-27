@@ -46,6 +46,10 @@ class AoiRule:
 class StudyConfig:
     field_start: str = ""
     field_end: str = ""
+    timezone: str = "Europe/Zurich"
+    variant_start: dict[str, str] = field(default_factory=dict)
+    scale_min: int = 1
+    scale_max: int = 5
     exclude_visits_file: str = "config/exclude_visits.csv"
     device_types: list[int] = field(default_factory=list)
     require_form: bool = False
@@ -68,6 +72,10 @@ def load_config(path: Path | None = None) -> StudyConfig:
     return StudyConfig(
         field_start=s.get("field_start", ""),
         field_end=s.get("field_end", ""),
+        timezone=s.get("timezone", "Europe/Zurich"),
+        variant_start=dict(s.get("variant_start", {})),
+        scale_min=int(raw.get("questionnaire", {}).get("scale_min", 1)),
+        scale_max=int(raw.get("questionnaire", {}).get("scale_max", 5)),
         exclude_visits_file=s.get("exclude_visits_file", "config/exclude_visits.csv"),
         device_types=list(s.get("device_types", [])),
         require_form=bool(s.get("require_form", False)),

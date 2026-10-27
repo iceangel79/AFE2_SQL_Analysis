@@ -6,10 +6,11 @@ Auswertung mit dem Team abgleichen und hier anpassen:
 - H1: Mehr Richtungswechsel pro Sekunde gehen mit tieferer pragmatischer Qualität (UEQ-S) einher.
       Spearman-Korrelation, erwartet negativ.
 - H2: Längere Zeit bis zum Formular geht mit höherem Schwierigkeitswert einher
-      (Skala umgepolt: 7 = sehr schwierig). Spearman, erwartet positiv.
+      (Skala umgepolt: 5 = sehr schwierig). Spearman, erwartet positiv.
 - H3a: Task Success (0-3 richtige Antworten) unterscheidet sich zwischen OP und ML. Mann-Whitney-U.
 - H3b: UEQ-S-Gesamtwert unterscheidet sich zwischen OP und ML. Mann-Whitney-U (plus Welch-t-Test).
-- H4 (explorativ): Verweildauer der Maus auf dem Porträt unterscheidet sich nach Geschlecht. Mann-Whitney-U.
+- H4 (explorativ): Verweildauer der Maus auf dem Porträt unterscheidet sich zwischen
+      weiblich und männlich ("keine Angabe" ausgeschlossen). Mann-Whitney-U.
 - H5: Maus-Kennzahlen allein erklären weniger Varianz im UEQ-S-Gesamtwert als
       Maus-Kennzahlen plus Task Success und Schwierigkeit. Vergleich R² (OLS).
 
@@ -92,10 +93,7 @@ def run_hypotheses(df: pd.DataFrame) -> pd.DataFrame:
         welch(df, "ueqs_total", "variant", "H3b", "OP", "ML"),
     ]
     if "geschlecht" in df:
-        g = df["geschlecht"].dropna().value_counts()
-        if len(g) >= 2:
-            a, b = g.index[:2]
-            rows.append(group_compare(df, "aoi_portrait_dwell_ms", "geschlecht", "H4 (explorativ)", a, b))
+        rows.append(group_compare(df, "aoi_portrait_dwell_ms", "geschlecht", "H4 (explorativ)", "weiblich", "männlich"))
     rows.append(r2_compare(df, "ueqs_total", mouse, ["task_success", "seq_mean"], "H5"))
     return pd.DataFrame(rows)
 
