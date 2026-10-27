@@ -37,8 +37,9 @@ DEVICE_TYPES = {1: "desktop", 2: "tablet", 3: "smartphone"}
 @dataclass
 class AoiRule:
     name: str
-    url_regex: str
-    selector_regex: str
+    url_regex: str = ""
+    selector_regex: str = ""
+    image_regex: str = ""
     description: str = ""
 
 
@@ -65,6 +66,8 @@ class StudyConfig:
     pause_ms: int = 1000
     dwell_cap_ms: int = 3000
     aoi: list[AoiRule] = field(default_factory=list)
+    content_image_regex: str = ""
+    exclude_admin_bar: bool = True
 
     @property
     def exclude_path(self) -> Path:
@@ -104,6 +107,8 @@ def load_config(path: Path | None = None) -> StudyConfig:
         pause_ms=int(m.get("pause_ms", 1000)),
         dwell_cap_ms=int(m.get("dwell_cap_ms", 3000)),
         aoi=[AoiRule(**a) for a in raw.get("aoi", [])],
+        content_image_regex=raw.get("images", {}).get("content_regex", ""),
+        exclude_admin_bar=bool(s.get("exclude_admin_bar", True)),
     )
 
 

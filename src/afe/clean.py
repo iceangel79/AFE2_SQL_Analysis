@@ -68,6 +68,10 @@ def load_events(con: sqlite3.Connection, pv: pd.DataFrame) -> pd.DataFrame:
     )
     ev["event"] = ev["event_type"].map(EVENT_TYPES)
     ev = ev.merge(pv[["idloghsr", "idvisit", "url", "page"]], on="idloghsr", how="left")
+    # Bild unter dem Element (über den DOM-Snapshot der Seite aufgelöst)
+    from .dom import selector_image_map
+
+    ev = ev.merge(selector_image_map(con), on=["url", "selector"], how="left")
     return ev.sort_values(["idloghsr", "t_ms", "idhsrevent"]).reset_index(drop=True)
 
 
@@ -115,6 +119,12 @@ def build_visits(con: sqlite3.Connection, pv: pd.DataFrame, cfg: StudyConfig) ->
     else:
         warnings.warn("log_visit fehlt im Dump: Browser/OS nicht verfügbar.")
 
+    # Besuche mit WordPress-Adminleiste = eingeloggte Admins (Tests)
+    admin = {r[0] for r in con.execute(
+        """SELECT DISTINCT h.idvisit FROM log_hsr_event e JOIN log_hsr h USING (idloghsr)
+           JOIN log_action s ON s.idaction = e.idselector WHERE s.name LIKE '%wp-admin-bar%'""")}
+    visits["admin_bar"] = visits["idvisit"].isin(admin)
+
     visits["exclusion"] = _exclusion_reasons(visits, cfg)
     visits["included"] = visits["exclusion"].eq("")
     return visits
@@ -139,6 +149,8 @@ def _exclusion_reasons(visits: pd.DataFrame, cfg: StudyConfig) -> pd.Series:
         mark(visits["variant"].eq(variant) & (local < pd.Timestamp(day)), f"vor gültigem Start {variant}")
     if cfg.field_end:
         mark(local >= pd.Timestamp(cfg.field_end) + pd.Timedelta(days=1), "nach Feldende")
+    if cfg.exclude_admin_bar:
+        mark(visits["admin_bar"], "WordPress-Admin eingeloggt (Test)")
     if cfg.device_types:
         mark(~visits["device_type"].isin(cfg.device_types), "Gerät ausgeschlossen")
     mark(visits["variant"].eq("gemischt"), "beide Varianten besucht")

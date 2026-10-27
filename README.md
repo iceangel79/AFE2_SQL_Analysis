@@ -68,7 +68,8 @@ Alle Entscheidungen der Auswertung stehen in **`config/study.toml`**, nicht im C
   `variant_start` erlaubt einen späteren Start pro Variante (ML ab 27.10.2026, siehe Kommentar)
 - `config/exclude_visits.csv`: einzelne Besuche mit Begründung ausschliessen
 - Gerätetypen (Standard: nur Desktop, da Maus-Tracking)
-- Optional: nur Besuche mit Formular, Mindestdauer
+- Nur Besuche mit Formular (`require_form`, aktiv), optional Mindestdauer
+- Besuche eingeloggter WordPress-Admins (Adminleiste sichtbar) werden als Tests ausgeschlossen
 - Schwellenwerte der Kennzahlen (Richtungswechsel, Pausen, AOI-Verweildauer)
 - AOI-Definitionen (Porträt) als URL- und CSS-Selektor-Regeln
 
@@ -107,6 +108,14 @@ Ohne WPForms-Tabelle im Dump kann der Fragebogen weiterhin manuell erfasst werde
 | `pause_share` | Anteil der Zeit mit ruhender Maus (Lücken ≥ `pause_ms`) |
 | `scroll_reversals` | Wechsel der Scrollrichtung |
 | `aoi_portrait_dwell_ms` | Verweildauer der Maus auf dem Porträt |
+| `aoi_portrait_hovered` | Porträt überhaupt mit der Maus berührt (ja/nein) |
+| `n_images_hovered` | Anzahl verschiedener Inhaltsbilder, über die die Maus gefahren ist |
+| `image_clicks` | Klicks auf Inhaltsbilder (öffnet die Vergrösserung/Lightbox) |
+| `lightbox_ms` | Zeit mit der Maus in der geöffneten Vergrösserung |
+
+Bilder werden erkannt, indem der CSS-Selektor jedes Mausereignisses im gespeicherten
+DOM-Snapshot der Seite aufgelöst wird (`dom.py`). Der Bericht enthält pro Bild und Variante
+den Anteil Besuche, die es überfahren bzw. angeklickt haben (`afe.bat images` zeigt alle Bilder).
 
 **Einschränkung:** Matomo speichert Mauspositionen relativ zum Element unter der Maus
 (skaliert auf 0–2000), nicht in Bildschirmpixeln. Absolute Pfadlängen oder eine

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from . import clean, features, forms, plots, stats
+from . import clean, dom, features, forms, plots, stats
 from .config import DATA_PROCESSED, OUTPUT, StudyConfig, ensure_dirs, load_config
 from .load import connect
 from .questionnaire import QUESTIONNAIRE_FILE, load_questionnaire, score
@@ -23,6 +23,8 @@ class Dataset:
     flow: pd.DataFrame
     entries: pd.DataFrame | None = None  # Fragebogen (ein Eintrag pro Zeile, mit Zuordnung)
     entry_flow: pd.DataFrame | None = None
+    image_usage: pd.DataFrame | None = None  # pro Besuch und Bild
+    page_images: dict | None = None  # URL -> Inhaltsbilder
 
     @property
     def included(self) -> pd.DataFrame:
@@ -55,9 +57,11 @@ def build(cfg: StudyConfig | None = None, write: bool = True) -> Dataset:
         vf = features.visit_features(visits, pvf)
         vf = clean.apply_completion_rules(vf, cfg)
         entries = _load_entries(con, vf, pvf, cfg)
+        page_imgs = dom.page_images(con, cfg.content_image_regex)
     finally:
         con.close()
     entry_flow = forms.entry_flow(entries) if entries is not None else None
+    usage = features.visit_image_usage(ev, pvf, cfg)
     ev = ev.merge(vf[["idvisit", "variant", "included"]], on="idvisit", how="left")
     for name, mask in features._aoi_masks(ev, cfg).items():
         ev[f"aoi_{name}"] = mask
@@ -67,9 +71,10 @@ def build(cfg: StudyConfig | None = None, write: bool = True) -> Dataset:
         vf.to_csv(DATA_PROCESSED / "visits.csv", index=False)
         ev.to_csv(DATA_PROCESSED / "events.csv", index=False)
         flow.to_csv(DATA_PROCESSED / "stichprobe.csv", index=False)
+        usage.to_csv(DATA_PROCESSED / "bilder.csv", index=False)
         if entries is not None:
             entries.to_csv(DATA_PROCESSED / "fragebogen.csv", index=False)
-    return Dataset(cfg, pvf, ev, vf, flow, entries, entry_flow)
+    return Dataset(cfg, pvf, ev, vf, flow, entries, entry_flow, usage, page_imgs)
 
 
 def _load_entries(con, visits: pd.DataFrame, pvf: pd.DataFrame, cfg: StudyConfig) -> pd.DataFrame | None:
@@ -99,6 +104,7 @@ def report(ds: Dataset | None = None) -> None:
     inc = ds.included
 
     comparison = stats.compare_variants(inc, features.KEY_METRICS)
+    img_summary = features.image_summary(ds.image_usage, inc, ds.pageviews, ds.page_images)
     sel = features.selector_summary(ds.events[ds.events["included"].fillna(False).astype(bool)])
 
     hyp = None
@@ -107,6 +113,9 @@ def report(ds: Dataset | None = None) -> None:
         hyp = stats.run_hypotheses(merged, ds.questionnaire)
 
     figs = [plots.boxplots(inc, features.KEY_METRICS, fig_dir), plots.page_paths(ds.pageviews, ds.visits, fig_dir)]
+    f = plots.image_usage(img_summary, fig_dir)
+    if f:
+        figs.append(f)
     inc_ev = ds.events[ds.events["included"].fillna(False).astype(bool)]
     if "aoi_portrait" in inc_ev:
         f = plots.aoi_hover_map(inc_ev, "aoi_portrait", fig_dir, "Mauspositionen auf dem Porträt")
@@ -116,6 +125,7 @@ def report(ds: Dataset | None = None) -> None:
     with pd.ExcelWriter(OUTPUT / "tabellen.xlsx") as xw:
         ds.flow.to_excel(xw, sheet_name="Stichprobe", index=False)
         comparison.to_excel(xw, sheet_name="Variantenvergleich", index=False)
+        img_summary.to_excel(xw, sheet_name="Bilder", index=False)
         inc.to_excel(xw, sheet_name="Besuche", index=False)
         sel.head(500).to_excel(xw, sheet_name="Elemente", index=False)
         if hyp is not None:
@@ -124,7 +134,7 @@ def report(ds: Dataset | None = None) -> None:
             ds.entries.drop(columns=["feedback"], errors="ignore").to_excel(xw, sheet_name="Fragebogen", index=False)
             merged.to_excel(xw, sheet_name="Besuche+Fragebogen", index=False)
 
-    _write_markdown(ds, comparison, hyp, figs)
+    _write_markdown(ds, comparison, hyp, figs, img_summary)
     print(f"Bericht: {OUTPUT / 'bericht.md'}")
     print(f"Tabellen: {OUTPUT / 'tabellen.xlsx'}")
 
@@ -141,7 +151,8 @@ def _has_tabulate() -> bool:
         return False
 
 
-def _write_markdown(ds: Dataset, comparison: pd.DataFrame, hyp: pd.DataFrame | None, figs: list) -> None:
+def _write_markdown(ds: Dataset, comparison: pd.DataFrame, hyp: pd.DataFrame | None, figs: list,
+                    img_summary: pd.DataFrame) -> None:
     cfg = ds.cfg
     lines = [
         "# AFE2 Auswertung",
@@ -154,7 +165,8 @@ def _write_markdown(ds: Dataset, comparison: pd.DataFrame, hyp: pd.DataFrame | N
         f"- Späterer Start je Variante: {cfg.variant_start or 'keiner'}",
         f"- Fragebogen-Skalen: {cfg.scale_min} bis {cfg.scale_max}",
         f"- Geräte: {cfg.device_types or 'alle'}",
-        f"- Nur mit Formular: {'ja' if cfg.require_form else 'nein'}, Mindestdauer: {cfg.min_total_s:g} s",
+        f"- Nur mit Formular: {'ja' if cfg.require_form else 'nein'}, Mindestdauer: {cfg.min_total_s:g} s, "
+        f"Admin-Besuche ausgeschlossen: {'ja' if cfg.exclude_admin_bar else 'nein'}",
         f"- Richtungswechsel ab {cfg.direction_min_delta} Element-Einheiten, Pause ab {cfg.pause_ms} ms, "
         f"AOI-Deckel {cfg.dwell_cap_ms} ms",
         "",
@@ -165,6 +177,13 @@ def _write_markdown(ds: Dataset, comparison: pd.DataFrame, hyp: pd.DataFrame | N
         "## Variantenvergleich Maus-Kennzahlen (explorativ)",
         "",
         _fmt(comparison[["kennzahl", "ML_n", "ML_median", "OP_n", "OP_median", "p", "effekt", "hinweis"]]),
+        "",
+        "## Bilder: überfahren und angeklickt (Vergrösserung)",
+        "",
+        "Basis: eingeschlossene Besuche, die eine Seite mit dem Bild aufgerufen haben.",
+        "",
+        _fmt(img_summary.assign(image=img_summary["image"].str.replace("-Mira-Caduff", "", regex=False))[
+            ["variant", "image", "besuche_mit_bild", "anteil_ueberfahren", "anteil_angeklickt", "median_ms_wenn_ueberfahren"]]),
         "",
     ]
     if hyp is not None:

@@ -52,8 +52,15 @@ def _aoi_masks(ev: pd.DataFrame, cfg: StudyConfig) -> dict[str, pd.Series]:
     masks: dict[str, pd.Series] = {}
     sel = ev["selector"].fillna("")
     url = ev["url"].fillna("")
+    img = ev["image"].fillna("") if "image" in ev else pd.Series("", index=ev.index)
     for rule in cfg.aoi:
-        m = url.str.contains(rule.url_regex, regex=True) & sel.str.contains(rule.selector_regex, regex=True)
+        m = pd.Series(True, index=ev.index)
+        if rule.url_regex:
+            m &= url.str.contains(rule.url_regex, regex=True)
+        if rule.selector_regex:
+            m &= sel.str.contains(rule.selector_regex, regex=True)
+        if rule.image_regex:
+            m &= img.str.contains(rule.image_regex, regex=True)
         masks[rule.name] = masks.get(rule.name, pd.Series(False, index=ev.index)) | m
     return masks
 
@@ -115,6 +122,15 @@ def pageview_features(pv: pd.DataFrame, ev: pd.DataFrame, cfg: StudyConfig) -> p
             r[f"{c}_events"] = int(m.sum())
             r[f"{c}_first_ms"] = float(t[m].min()) if m.any() else np.nan
 
+        # Bilder (Selektor -> Bild über den DOM-Snapshot, siehe dom.selector_image_map)
+        imgs = mouse["image"] if "image" in mouse else pd.Series(dtype=object)
+        has_img = imgs.notna().to_numpy() if len(mouse) else np.array([], dtype=bool)
+        r["n_images_hovered"] = int(imgs.dropna().nunique())
+        r["image_clicks"] = int(((mouse["event_type"] == 2).to_numpy() & has_img).sum()) if len(mouse) else 0
+        lb = mouse["selector"].fillna("").str.startswith(("div#lightbox", "div#lightboxOverlay")).to_numpy() if len(mouse) else np.array([], dtype=bool)
+        r["lightbox_ms"] = float(hold[lb].sum()) if len(t) else 0.0
+        r["image_dwell_ms"] = float(hold[has_img].sum()) if len(t) else 0.0
+
         r["dir_change_rate"] = r["dir_changes"] / dur_s
         r["switch_rate"] = r["element_switches"] / dur_s
         rows.append(r)
@@ -124,6 +140,7 @@ def pageview_features(pv: pd.DataFrame, ev: pd.DataFrame, cfg: StudyConfig) -> p
 
 
 SUM_COLS = [
+    "image_clicks", "lightbox_ms", "image_dwell_ms",
     "time_on_page_ms", "n_moves", "n_clicks", "n_scroll_events", "n_form_events", "element_switches",
     "dir_changes_x", "dir_changes_y", "dir_changes", "n_pauses", "pause_time_ms", "scroll_reversals",
 ]
@@ -133,6 +150,8 @@ def visit_features(visits: pd.DataFrame, pvf: pd.DataFrame) -> pd.DataFrame:
     aoi_dwell = [c for c in pvf.columns if c.startswith("aoi_") and c.endswith(("_dwell_ms", "_events"))]
     agg = pvf.groupby("idvisit")[SUM_COLS + aoi_dwell].sum()
     agg["n_pages_distinct"] = pvf.groupby("idvisit")["page"].nunique()
+    for c in [c for c in pvf.columns if c.startswith("aoi_") and c.endswith("_events")]:
+        agg[c.replace("_events", "_hovered")] = agg[c] > 0
     agg["scroll_max_pct_mean"] = pvf.groupby("idvisit")["scroll_max_pct"].mean()
 
     # Time-to-Form: Zeit bis zur ersten Formulareingabe.
@@ -169,6 +188,9 @@ KEY_METRICS = {
     "pause_share": "Anteil Pausenzeit",
     "scroll_reversals": "Scroll-Richtungswechsel",
     "aoi_portrait_dwell_ms": "Verweildauer Porträt (ms)",
+    "n_images_hovered": "Bilder überfahren (Anzahl)",
+    "image_clicks": "Klicks auf Bilder (Vergrösserung)",
+    "lightbox_ms": "Zeit in Vergrösserung (ms)",
 }
 
 
@@ -181,3 +203,49 @@ def selector_summary(ev: pd.DataFrame) -> pd.DataFrame:
     )
     return out.reset_index().sort_values(["page", "moves"], ascending=[True, False])
 
+
+
+def visit_image_usage(ev: pd.DataFrame, pv: pd.DataFrame, cfg: StudyConfig) -> pd.DataFrame:
+    """Pro Besuch und Bild: Bild geladen (Seite besucht), überfahren, Verweildauer, angeklickt."""
+    import re
+
+    rx = re.compile(cfg.content_image_regex) if cfg.content_image_regex else None
+    m = ev[ev["event_type"].isin((1, 2))].sort_values(["idloghsr", "t_ms"]).copy()
+    end = m["idloghsr"].map(pv.set_index("idloghsr")["time_on_page_ms"])
+    nxt = m.groupby("idloghsr")["t_ms"].shift(-1).fillna(end)
+    m["hold_ms"] = (nxt - m["t_ms"]).clip(0, cfg.dwell_cap_ms)
+    m = m.dropna(subset=["image"])
+    if rx is not None:
+        m = m[m["image"].map(lambda s: bool(rx.search(s)))]
+    g = m.groupby(["idvisit", "image"])
+    return pd.DataFrame({
+        "hover_ms": g["hold_ms"].sum(),
+        "events": g.size(),
+        "clicked": g["event_type"].apply(lambda s: bool((s == 2).any())),
+    }).reset_index()
+
+
+def image_summary(usage: pd.DataFrame, visits: pd.DataFrame, pv: pd.DataFrame,
+                  page_imgs: dict[str, set[str]]) -> pd.DataFrame:
+    """Pro Variante und Bild: wie viele Besuche hatten das Bild auf einer besuchten Seite,
+    wie viele haben es überfahren bzw. angeklickt (Vergrösserung)?
+
+    visits: nur eingeschlossene Besuche."""
+    avail = (pv[pv["idvisit"].isin(visits["idvisit"])]
+             .assign(images=lambda d: d["url"].map(lambda u: sorted(page_imgs.get(u, set()))))
+             .explode("images").dropna(subset=["images"])
+             .rename(columns={"images": "image"})[["idvisit", "image"]].drop_duplicates())
+    avail = avail.merge(visits[["idvisit", "variant"]], on="idvisit")
+    d = avail.merge(usage, on=["idvisit", "image"], how="left")
+    d["hovered"] = d["events"].fillna(0) > 0
+    d["clicked"] = d["clicked"].fillna(False).astype(bool)
+    g = d.groupby(["variant", "image"])
+    out = pd.DataFrame({
+        "besuche_mit_bild": g.size(),
+        "ueberfahren": g["hovered"].sum(),
+        "angeklickt": g["clicked"].sum(),
+        "median_ms_wenn_ueberfahren": g.apply(lambda x: x.loc[x["hovered"], "hover_ms"].median()),
+    }).reset_index()
+    out["anteil_ueberfahren"] = out["ueberfahren"] / out["besuche_mit_bild"]
+    out["anteil_angeklickt"] = out["angeklickt"] / out["besuche_mit_bild"]
+    return out

@@ -60,7 +60,7 @@ src/afe/
   questionnaire.py UEQ-S/Schwierigkeit/Task Success berechnen; manuelle CSV als Fallback
   stats.py         Hypothesentests H1-H5, Variantenvergleich
   plots.py         Grafiken
-  dom.py           DOM-Snapshots auswerten (AOI-Selektoren prüfen)
+  dom.py           DOM-Snapshots: CSS-Selektoren auflösen, Bild unter der Maus bestimmen
   pipeline.py      Ablauf build() -> report()
   cli.py           Befehle für afe.bat
 config/study.toml  ALLE methodischen Parameter
@@ -99,9 +99,12 @@ das Formular; Matomo zeichnet dabei noch Formularereignisse bis ca. 30 s nach de
   indem der DOM-Snapshot (Typ 5 + CSS Typ 13) mit Playwright in der Viewport-Grösse gerendert
   und die Bounding-Box jedes Selektors gemessen wird. **Noch nicht umgesetzt** (offene Aufgabe).
 
-Porträt-AOI: in beiden Varianten 3. Zeile, rechte Spalte
-(`article#post-12` = Startseite, `article#post-46` = Onepager), Datei `Portrait-Mira-Caduff-*.jpg`.
-Mit `afe.bat images` überprüfbar.
+Bilder: Jeder Selektor wird im DOM-Snapshot der Seite aufgelöst (`dom.DomIndex`); liegt darunter
+genau ein IMG, wird es dem Ereignis zugeordnet (Spalte `image`, Dateiname ohne Grösse/Endung).
+Beide Varianten zeigen dieselben 8 Inhaltsbilder (`*-Mira-Caduff`), alle mit Link zur Vergrösserung
+(Lightbox; Ereignisse mit Selektor `div#lightbox...`). Porträt-AOI = Bild `Portrait-Mira-Caduff`
+(Startseite ML und Onepager). Prüfen mit `afe.bat images`.
+Besuche mit Selektoren `wp-admin-bar` stammen von eingeloggten Admins und werden ausgeschlossen.
 
 ## Regeln
 
@@ -137,7 +140,7 @@ Mit `afe.bat images` überprüfbar.
 ## Offene Punkte
 
 - Einzelne Testbesuche während der Feldphase in `exclude_visits.csv` eintragen (z. B. WordPress-Customizer-Vorschau).
-- Entscheiden, ob nur Besuche mit Formular zählen (`require_form`) und ob es eine Mindestdauer gibt.
+- `require_form = true` (Teamentscheid 27.10.2026): Maus-Kennzahlen nur von Besuchen bis zum Formular.
 - Hypothesen in `stats.py` mit der finalen Fassung der Arbeit abgleichen (Stand 21.10.2026:
   H1 auf UEQ-S pragmatische Qualität, H2 mit umgepolter Schwierigkeit).
 - Optional: absolute Koordinaten über Playwright-Rendering der DOM-Snapshots (für Movement Path Entropy).

@@ -11,6 +11,8 @@ Auswertung mit dem Team abgleichen und hier anpassen:
 - H3b: UEQ-S-Gesamtwert unterscheidet sich zwischen OP und ML. Mann-Whitney-U (plus Welch-t-Test).
 - H4 (explorativ): Verweildauer der Maus auf dem Porträt unterscheidet sich zwischen
       weiblich und männlich ("keine Angabe" ausgeschlossen). Mann-Whitney-U.
+- H4b (explorativ): Anteil, der das Porträt überhaupt mit der Maus berührt, nach Geschlecht.
+      Fisher-Test (die Verweildauer ist bei den meisten 0, daher zusätzlich ja/nein).
 - H5: Maus-Kennzahlen allein erklären weniger Varianz im UEQ-S-Gesamtwert als
       Maus-Kennzahlen plus Task Success und Schwierigkeit. Vergleich R² (OLS).
 
@@ -71,6 +73,18 @@ def welch(df: pd.DataFrame, value: str, group: str, h: str, a: str, b: str) -> d
     return _row(h, f"Welch-t {value} nach {group}", n, t, p, d, "Effekt = Cohens d")
 
 
+def fisher(df: pd.DataFrame, flag: str, group: str, h: str, a: str, b: str) -> dict:
+    d = df[df[group].isin([a, b])].dropna(subset=[flag])
+    if d[group].nunique() < 2:
+        return _row(h, f"Fisher {flag} nach {group}", len(d), np.nan, np.nan, note="zu wenig Daten")
+    tab = pd.crosstab(d[group], d[flag].astype(bool)).reindex(index=[a, b], columns=[True, False], fill_value=0)
+    odds, p = stats.fisher_exact(tab.to_numpy())
+    share = (tab[True] / tab.sum(axis=1)).round(2)
+    n = f"{a}={int(tab.loc[a].sum())}, {b}={int(tab.loc[b].sum())}"
+    return _row(h, f"Fisher {flag} nach {group}", n, odds, p, odds,
+                f"Anteil ja: {a}={share[a]:.0%}, {b}={share[b]:.0%}; Effekt = Odds Ratio")
+
+
 def r2_compare(df: pd.DataFrame, y: str, base: list[str], extra: list[str], h: str) -> dict:
     import statsmodels.api as sm
 
@@ -96,6 +110,7 @@ def run_hypotheses(mouse: pd.DataFrame, quest: pd.DataFrame) -> pd.DataFrame:
         group_compare(quest, "ueqs_total", "variante", "H3b", "OP", "ML"),
         welch(quest, "ueqs_total", "variante", "H3b", "OP", "ML"),
         group_compare(mouse, "aoi_portrait_dwell_ms", "geschlecht", "H4 (explorativ)", "weiblich", "männlich"),
+        fisher(mouse, "aoi_portrait_hovered", "geschlecht", "H4b (explorativ)", "weiblich", "männlich"),
         r2_compare(mouse, "ueqs_total", mouse_metrics, ["task_success", "seq_mean"], "H5"),
     ]
     return pd.DataFrame(rows)

@@ -19,8 +19,12 @@ exclude_visits_file = "config/exclude_visits.csv"
 # Nur diese Gerätetypen auswerten (Matomo device_type: 1 = Desktop, 2 = Tablet, 3 = Smartphone).
 # Leer = alle Geräte.
 device_types = [1]
-# Nur Besuche auswerten, die das Formular erreicht haben (erste Eingabe im Fragebogen)
-require_form = false
+# Besuche mit sichtbarer WordPress-Adminleiste ausschliessen (eingeloggte Admins = Tests)
+exclude_admin_bar = true
+# Nur Besuche auswerten, die das Formular erreicht haben (erste Eingabe im Fragebogen).
+# Teamentscheid 27.10.2026: ja. Sonst vergleicht man Abbrüche (v. a. Menüversion) mit
+# vollständigen Durchläufen, was die Maus-Kennzahlen verzerrt.
+require_form = true
 # Mindestdauer eines Besuchs in Sekunden (0 = keine Grenze), filtert Kurzbesuche/Abbrüche
 min_total_s = 0
 
@@ -70,13 +74,18 @@ pause_ms = 1000
 # Verhindert, dass ruhende Maus (z. B. beim Lesen) ohne Ende als Verweildauer zählt.
 dwell_cap_ms = 3000
 
-# Areas of Interest (AOI): Liste von Regeln. Ein Mausereignis liegt in der AOI,
-# wenn die Seiten-URL url_regex trifft UND der CSS-Selektor selector_regex trifft.
-# Prüfen mit:  afe.bat images   (zeigt die Bilder und ihre Position im DOM)
-# Porträt verifiziert am 27.10.2026 über den DOM-Snapshot: In beiden Varianten
-# 3. Zeile, rechte Spalte (vc_col-sm-4), Datei Portrait-Mira-Caduff-*.jpg.
+[images]
+# Inhaltsbilder (Bildname ohne Grösse/Endung). Platzhalter und Ladesymbole fallen weg.
+# Auf beiden Varianten dieselben 8 Bilder (Abgleich DOM-Snapshot und Live-Seite 27.10.2026):
+# Titelbild, Portrait, Podest, Rennszene, Training, Werkstatt, Sponsorenabend, Strandbild.
+# Alle sind auf die Grossansicht verlinkt (Lightbox).
+content_regex = "-Mira-Caduff$"
+
+# Areas of Interest (AOI): Ein Mausereignis liegt in der AOI, wenn alle angegebenen
+# Regeln zutreffen: url_regex (Seiten-URL), selector_regex (CSS-Selektor) und/oder
+# image_regex (Bild unter der Maus, über den DOM-Snapshot bestimmt). Leer = egal.
+# Prüfen mit:  afe.bat images
 [[aoi]]
 name = "portrait"
 description = "Porträt von Mira (Startseite Menüversion und Onepager)"
-url_regex = "eagle-wings\\.ch/(?:one-pager/)?$"
-selector_regex = "^article#post-(?:12|46) > div > div > div:nth-child\\(3\\) > div\\.wpb_column\\.vc_column_container\\.vc_col-sm-4 > div > div > div > figure(?: > a(?: > img)?)?$"
+image_regex = "^Portrait-Mira-Caduff$"
