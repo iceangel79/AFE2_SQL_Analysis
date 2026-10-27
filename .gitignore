@@ -1,0 +1,39 @@
+# --- Daten: NIE ins Repo (öffentliches Repo, mögliche Personendaten) ---
+data/raw/*
+data/processed/*
+data/manual/*
+output/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/manual/.gitkeep
+!output/.gitkeep
+*.sql
+*.sql.gz
+*.sqlite
+*.sqlite3
+*.db
+*.parquet
+*.xlsx
+*.csv
+!config/*.csv
+!config/templates/*.csv
+!tests/fixtures/*
+
+# --- Python / Umgebung ---
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# --- Notebooks: Outputs können Daten enthalten ---
+.ipynb_checkpoints/
+
+# --- Editor / OS ---
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store

@@ -1,0 +1,46 @@
+# Studienkonfiguration AFE2
+# Alle methodischen Entscheidungen der Auswertung stehen hier (oder in den
+# CSV-Dateien in diesem Ordner) und nicht im Code. Jede Änderung wird über Git
+# nachvollziehbar und kann im Methodenteil der Arbeit zitiert werden.
+
+[sample]
+# Erster und letzter Tag der Feldphase (ISO-Datum, inklusive, Serverzeit UTC).
+# Leer = keine Datumsgrenze (die Pipeline warnt dann).
+field_start = ""
+field_end = ""
+# Zusätzlich ausgeschlossene Besuche (Tests, Abbrüche usw.) mit Begründung
+exclude_visits_file = "config/exclude_visits.csv"
+# Nur diese Gerätetypen auswerten (Matomo device_type: 1 = Desktop, 2 = Tablet, 3 = Smartphone).
+# Leer = alle Geräte.
+device_types = [1]
+# Nur Besuche auswerten, die das Formular erreicht haben (erste Eingabe im Fragebogen)
+require_form = false
+# Mindestdauer eines Besuchs in Sekunden (0 = keine Grenze), filtert Kurzbesuche/Abbrüche
+min_total_s = 0
+
+[variants]
+# Zuordnung eines Besuchs zur Variante anhand der URLs seiner Seitenaufrufe
+op_url_contains = "one-pager"
+# Kontaktseite mit dem Fragebogen (Ende der Aufgabe, "Time-to-Form")
+form_url_contains = "kontakt"
+
+[metrics]
+# Matomo speichert x/y relativ zum Element unter der Maus, skaliert auf 0..2000.
+# Mindestbewegung (in Element-Einheiten), damit ein Richtungswechsel zählt (filtert Zittern)
+direction_min_delta = 20
+# Lücke zwischen zwei Mausereignissen, ab der eine Pause (Zögern) gezählt wird (ms)
+pause_ms = 1000
+# Obergrenze, mit der eine Lücke höchstens zur AOI-Verweildauer beiträgt (ms).
+# Verhindert, dass ruhende Maus (z. B. beim Lesen) ohne Ende als Verweildauer zählt.
+dwell_cap_ms = 3000
+
+# Areas of Interest (AOI): Liste von Regeln. Ein Mausereignis liegt in der AOI,
+# wenn die Seiten-URL url_regex trifft UND der CSS-Selektor selector_regex trifft.
+# Prüfen mit:  afe.bat images   (zeigt die Bilder und ihre Position im DOM)
+# Porträt verifiziert am 27.10.2026 über den DOM-Snapshot: In beiden Varianten
+# 3. Zeile, rechte Spalte (vc_col-sm-4), Datei Portrait-Mira-Caduff-*.jpg.
+[[aoi]]
+name = "portrait"
+description = "Porträt von Mira (Startseite Menüversion und Onepager)"
+url_regex = "eagle-wings\\.ch/(?:one-pager/)?$"
+selector_regex = "^article#post-(?:12|46) > div > div > div:nth-child\\(3\\) > div\\.wpb_column\\.vc_column_container\\.vc_col-sm-4 > div > div > div > figure(?: > a(?: > img)?)?$"

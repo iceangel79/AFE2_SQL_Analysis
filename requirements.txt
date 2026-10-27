@@ -1,0 +1,25 @@
+# Abhängigkeiten für die AFE2-Auswertung (Python 3.12 empfohlen, mind. 3.11)
+# Installation: setup.bat (Windows) bzw. pip install -r requirements.txt
+# Versionen sind fixiert, damit alle Rechner identische Ergebnisse liefern.
+
+# Datenverarbeitung
+pandas==3.1.0
+numpy==2.5.4
+
+# Statistik (Gruppenvergleiche, Korrelationen, Regression für H1-H5)
+scipy==1.18.1
+statsmodels==0.15.0
+
+# Grafiken
+matplotlib==3.11.2
+
+# Export von Tabellen für Word/Excel
+openpyxl==3.1.5
+tabulate==0.10.0  # Markdown-Tabellen im Bericht
+
+# Notebooks (explorative Analysen)
+jupyterlab==4.6.4
+ipykernel==7.4.0
+
+# Tests
+pytest==9.1.1

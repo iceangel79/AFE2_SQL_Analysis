@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "afe"
+version = "0.1.0"
+description = "Reproduzierbare Auswertung der Matomo-Maus-Tracking-Daten für die AFE2-Studie (FFHS MSc WI)"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Adrian Wegmann" }, { name = "Adrian Martic" }]
+
+[project.scripts]
+afe = "afe.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
