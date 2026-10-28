@@ -130,7 +130,10 @@ Besuche mit Selektoren `wp-admin-bar` stammen von eingeloggten Admins und werden
   README und einen Test.
 - Annahmen über das Matomo-Datenformat als solche kennzeichnen und am echten Export prüfen.
 - Statistische Tests: zweiseitig, alpha 0.05, nichtparametrisch als Standard (kleine Gruppen);
-  Effektstärken immer mit angeben.
+  Effektstärken immer mit angeben, Richtung in Spalte `hoeher_in`. Fisher: Risikodifferenz mit KI
+  plus Haldane-OR. Mehrfachtests mit Holm je klar benannter Familie.
+- Klick-Kategorien (`dom.click_category`): navigation, bild, lightbox, formular, sonstiges. Die Lightbox
+  fehlt im ersten DOM-Snapshot und wird über den Selektor erkannt.
 
 ### Code
 - Python ≥ 3.12 (Ziel 3.14), Abhängigkeiten nur über `requirements.txt` mit fixierten Versionen.

@@ -87,6 +87,11 @@ def pageview_features(pv: pd.DataFrame, ev: pd.DataFrame, cfg: StudyConfig) -> p
 
         r["n_moves"] = len(moves)
         r["n_clicks"] = len(clicks)
+        cats = clicks["click_cat"].fillna("sonstiges") if "click_cat" in clicks else pd.Series(dtype=object)
+        for cat in ("navigation", "bild", "lightbox", "formular", "sonstiges"):
+            r[f"clicks_{cat}"] = int((cats == cat).sum())
+        r["clicks_ohne_navigation"] = r["n_clicks"] - r["clicks_navigation"]
+        r["clicks_inhalt"] = r["clicks_bild"] + r["clicks_lightbox"] + r["clicks_sonstiges"]
         r["n_scroll_events"] = len(scrolls)
         r["first_click_ms"] = clicks["t_ms"].min() if len(clicks) else np.nan
         r["first_form_ms"] = forms["t_ms"].min() if len(forms) else np.nan
@@ -104,6 +109,10 @@ def pageview_features(pv: pd.DataFrame, ev: pd.DataFrame, cfg: StudyConfig) -> p
         r["dir_changes_x"] = dx
         r["dir_changes_y"] = dy
         r["dir_changes"] = dx + dy
+        # Sensitivität: dieselbe Kennzahl mit anderen Mindestbewegungen
+        for thr in cfg.direction_sensitivity:
+            r[f"dir_changes_t{thr}"] = (_direction_changes(moves["x"].to_numpy(), msel, thr)
+                                        + _direction_changes(moves["y"].to_numpy(), msel, thr))
 
         gaps = np.diff(t) if len(t) > 1 else np.array([])
         long_gaps = gaps[gaps >= cfg.pause_ms]
@@ -140,6 +149,8 @@ def pageview_features(pv: pd.DataFrame, ev: pd.DataFrame, cfg: StudyConfig) -> p
 
 
 SUM_COLS = [
+    "clicks_navigation", "clicks_bild", "clicks_lightbox", "clicks_formular", "clicks_sonstiges",
+    "clicks_ohne_navigation", "clicks_inhalt",
     "image_clicks", "lightbox_ms", "image_dwell_ms",
     "time_on_page_ms", "n_moves", "n_clicks", "n_scroll_events", "n_form_events", "element_switches",
     "dir_changes_x", "dir_changes_y", "dir_changes", "n_pauses", "pause_time_ms", "scroll_reversals",
@@ -148,7 +159,8 @@ SUM_COLS = [
 
 def visit_features(visits: pd.DataFrame, pvf: pd.DataFrame) -> pd.DataFrame:
     aoi_dwell = [c for c in pvf.columns if c.startswith("aoi_") and c.endswith(("_dwell_ms", "_events"))]
-    agg = pvf.groupby("idvisit")[SUM_COLS + aoi_dwell].sum()
+    sens = [c for c in pvf.columns if c.startswith("dir_changes_t")]
+    agg = pvf.groupby("idvisit")[SUM_COLS + aoi_dwell + sens].sum()
     agg["n_pages_distinct"] = pvf.groupby("idvisit")["page"].nunique()
     for c in [c for c in pvf.columns if c.startswith("aoi_") and c.endswith("_events")]:
         agg[c.replace("_events", "_hovered")] = agg[c] > 0
@@ -173,6 +185,8 @@ def visit_features(visits: pd.DataFrame, pvf: pd.DataFrame) -> pd.DataFrame:
     total_s = agg["time_on_page_ms"] / 1000
     agg["time_total_s"] = total_s
     agg["dir_change_rate"] = agg["dir_changes"] / total_s.where(total_s > 0)
+    for c in sens:
+        agg[c.replace("dir_changes_", "dir_change_rate_")] = agg[c] / total_s.where(total_s > 0)
     agg["switch_rate"] = agg["element_switches"] / total_s.where(total_s > 0)
     agg["pause_share"] = agg["pause_time_ms"] / agg["time_on_page_ms"].where(agg["time_on_page_ms"] > 0)
     return visits.merge(agg.reset_index(), on="idvisit", how="left")
@@ -183,6 +197,11 @@ KEY_METRICS = {
     "time_total_s": "Gesamtzeit (s)",
     "time_to_form_s": "Zeit bis Formular (s)",
     "n_clicks": "Klicks",
+    "clicks_ohne_navigation": "Klicks ohne Navigation",
+    "clicks_inhalt": "Klicks auf Inhalte (ohne Navigation/Formular)",
+    "clicks_navigation": "Klicks Navigation (Menü/Links)",
+    "clicks_formular": "Klicks Formular",
+    "clicks_sonstiges": "Klicks Sonstiges",
     "dir_change_rate": "Richtungswechsel pro s",
     "switch_rate": "Elementwechsel pro s",
     "pause_share": "Anteil Pausenzeit",

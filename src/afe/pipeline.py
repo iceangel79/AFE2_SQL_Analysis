@@ -115,8 +115,14 @@ def report(ds: Dataset | None = None) -> None:
 
     hyp = None
     merged = ds.mouse_questionnaire
+    extra: dict[str, pd.DataFrame] = {}
     if ds.questionnaire is not None:
         hyp = stats.run_hypotheses(merged, ds.questionnaire)
+        extra["crosstab"] = pd.concat([
+            stats.crosstab_variant_gender(ds.questionnaire, "variante", "Fragebogen"),
+            stats.crosstab_variant_gender(merged, "variant", "Maus+Fragebogen"),
+        ], ignore_index=True).fillna(0)
+        extra["sensitivity"] = stats.sensitivity_h1(merged, inc, ds.cfg.direction_sensitivity)
 
     figs = [plots.boxplots(inc, features.KEY_METRICS, fig_dir), plots.page_paths(ds.pageviews, ds.visits, fig_dir)]
     for f in (plots.image_usage(img_summary, fig_dir),
@@ -143,11 +149,13 @@ def report(ds: Dataset | None = None) -> None:
         sel.head(500).to_excel(xw, sheet_name="Elemente", index=False)
         if hyp is not None:
             ds.entry_flow.to_excel(xw, sheet_name="Stichprobe Fragebogen", index=False)
+            extra["crosstab"].to_excel(xw, sheet_name="Variante x Geschlecht", index=False)
             hyp.to_excel(xw, sheet_name="Hypothesen", index=False)
+            extra["sensitivity"].to_excel(xw, sheet_name="Sensitivität Richtung", index=False)
             ds.entries.drop(columns=["feedback"], errors="ignore").to_excel(xw, sheet_name="Fragebogen", index=False)
             merged.to_excel(xw, sheet_name="Besuche+Fragebogen", index=False)
 
-    _write_markdown(ds, comparison, hyp, figs, img_summary, img_gender, img_tests, prov)
+    _write_markdown(ds, comparison, hyp, figs, img_summary, img_gender, img_tests, prov, extra)
     print(f"Bericht: {OUTPUT / 'bericht.md'}")
     print(f"Tabellen: {OUTPUT / 'tabellen.xlsx'}")
 
@@ -194,7 +202,7 @@ def _has_tabulate() -> bool:
 
 def _write_markdown(ds: Dataset, comparison: pd.DataFrame, hyp: pd.DataFrame | None, figs: list,
                     img_summary: pd.DataFrame, img_gender: pd.DataFrame | None, img_tests: pd.DataFrame,
-                    prov: pd.DataFrame) -> None:
+                    prov: pd.DataFrame, extra: dict[str, pd.DataFrame]) -> None:
     cfg = ds.cfg
     lines = [
         "# AFE2 Auswertung",
@@ -218,7 +226,14 @@ def _write_markdown(ds: Dataset, comparison: pd.DataFrame, hyp: pd.DataFrame | N
         "",
         "## Variantenvergleich Maus-Kennzahlen (explorativ)",
         "",
-        _fmt(comparison[["kennzahl", "ML_n", "ML_median", "OP_n", "OP_median", "p", "effekt", "hinweis"]]),
+        "Effekt = rang-biseriale Korrelation OP vs. ML (positiv = OP höher, negativ = ML höher); "
+        "Spalte «höher in» nennt die Variante mit den höheren Werten. "
+        "«Anteil > 0» zeigt bei Kennzahlen mit vielen Nullen, wie viele Besuche überhaupt einen Wert haben.",
+        "",
+        _fmt(comparison[["kennzahl", "ML_n", "ML_median", "ML_mittel", "ML_anteil_gt0", "OP_n", "OP_median",
+                         "OP_mittel", "OP_anteil_gt0", "p", "effekt", "hoeher_in"]]
+             .rename(columns={"hoeher_in": "höher in", "ML_anteil_gt0": "ML Anteil > 0",
+                              "OP_anteil_gt0": "OP Anteil > 0"})),
         "",
         "## Bilder: überfahren und angeklickt (Vergrösserung)",
         "",
@@ -234,7 +249,10 @@ def _write_markdown(ds: Dataset, comparison: pd.DataFrame, hyp: pd.DataFrame | N
                       ["geschlecht", "image", "besuche_mit_bild", "anteil_ueberfahren", "anteil_angeklickt",
                        "median_ms_wenn_ueberfahren"]]), ""]
     lines += ["### Tests je Bild (explorativ, Holm-korrigiert je Familie)", "",
-              _fmt(img_tests[["familie", "bild", "n", "p", "p_holm", "effekt", "hinweis"]]), ""]
+              "Fisher-Tests: Effekt = Risikodifferenz (Anteil erste minus zweite Gruppe) mit 95 %-KI; "
+              "bei Nullzellen zusätzlich Odds Ratio mit Haldane-Korrektur im Excel.", "",
+              _fmt(img_tests[["familie", "bild", "n", "p", "p_holm", "effekt", "hoeher_in", "hinweis"]]
+                   .rename(columns={"hoeher_in": "höher in"})), ""]
     if hyp is not None:
         e = ds.entries
         lines += ["## Stichprobe Fragebogen", "", _fmt(ds.entry_flow), "",
@@ -245,7 +263,15 @@ def _write_markdown(ds: Dataset, comparison: pd.DataFrame, hyp: pd.DataFrame | N
             ["count", "mean", "median"]).round(2)
         desc.columns = [f"{a}_{b}" for a, b in desc.columns]
         lines += ["## Fragebogen nach Variante", "", _fmt(desc.reset_index()), ""]
-        lines += ["## Hypothesen", "", _fmt(hyp), ""]
+        lines += ["## Variante x Geschlecht", "",
+                  "Geschlecht und Variante sind nicht unabhängig verteilt. Geschlechtsunterschiede deshalb "
+                  "auch nur innerhalb ML bzw. adjustiert für die Variante lesen.", "",
+                  _fmt(extra["crosstab"]), ""]
+        lines += ["## Hypothesen", "",
+                  _fmt(hyp[["hypothese", "test", "n", "statistik", "p", "effekt", "hoeher_in", "signifikant", "hinweis"]]
+                       .rename(columns={"hoeher_in": "höher in"})), ""]
+        lines += ["## Sensitivität Richtungswechsel (Schwelle in Element-Einheiten von 0..2000)", "",
+                  _fmt(extra["sensitivity"].rename(columns={"hoeher_in": "höher in"})), ""]
     else:
         lines += ["## Hypothesen", "", f"Noch keine Fragebogendaten ({QUESTIONNAIRE_FILE.name} fehlt).", ""]
     lines += ["## Grafiken", ""] + [f"![{f.stem}](figures/{f.name})" for f in figs]

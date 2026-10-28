@@ -36,3 +36,42 @@ def test_holm():
     adj = holm(p)
     assert round(adj[0], 3) == 0.03 and round(adj[3], 3) == 0.06 and round(adj[1], 3) == 0.06
     assert pd.isna(adj[2])
+
+
+def test_click_category():
+    from afe.dom import click_category
+
+    link_img = {"tagName": "A", "attributes": {"href": "/u/Strand-1024x687.jpg"}, "_parent": None}
+    img = {"tagName": "IMG", "attributes": {}, "_parent": link_img}
+    nav = {"tagName": "A", "attributes": {"href": "/training/"}, "_parent": None}
+    span = {"tagName": "SPAN", "attributes": {}, "_parent": nav}
+    text = {"tagName": "P", "attributes": {}, "_parent": None}
+    assert click_category("x > img", img) == "bild"
+    assert click_category("li#menu-item-40 > a > span", span) == "navigation"
+    assert click_category("article > p", text) == "sonstiges"
+    assert click_category("input#wpforms-79-field_4", None) == "formular"
+    assert click_category("div#lightbox > div.lb-dataContainer", None) == "lightbox"
+    assert click_category("li#menu-item-41 > a", None) == "navigation"
+
+
+def test_risk_difference_and_fisher_zero_cell():
+    import pandas as pd
+    from afe.stats import fisher, risk_difference
+
+    d, lo, hi = risk_difference(5, 10, 0, 10)
+    assert d == 0.5 and lo < 0.5 < hi and 0 < lo
+    df = pd.DataFrame({"g": ["a"] * 10 + ["b"] * 10, "f": [True] * 5 + [False] * 5 + [False] * 10})
+    r = fisher(df, "f", "g", "t", "a", "b")
+    assert r["hoeher_in"] == "a" and r["effekt"] == 0.5
+    assert 0 < r["odds_ratio_haldane"] < float("inf")
+
+
+def test_logistic_reports_separation():
+    import pandas as pd
+    from afe.stats import logistic_with_covariate
+
+    df = pd.DataFrame({"f": [True, False] * 6 + [False] * 8,
+                       "geschlecht": ["weiblich", "männlich"] * 10,
+                       "variant": ["ML"] * 12 + ["OP"] * 8})
+    r = logistic_with_covariate(df, "f", "geschlecht", "weiblich", "variant", "OP", "t")
+    assert "perfekte Trennung" in r["hinweis"]

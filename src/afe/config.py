@@ -63,6 +63,7 @@ class StudyConfig:
     op_url_contains: str = "one-pager"
     form_url_contains: str = "kontakt"
     direction_min_delta: int = 20
+    direction_sensitivity: list[int] = field(default_factory=lambda: [10, 20, 40])
     pause_ms: int = 1000
     dwell_cap_ms: int = 3000
     aoi: list[AoiRule] = field(default_factory=list)
@@ -104,6 +105,7 @@ def load_config(path: Path | None = None) -> StudyConfig:
         op_url_contains=v.get("op_url_contains", "one-pager"),
         form_url_contains=v.get("form_url_contains", "kontakt"),
         direction_min_delta=int(m.get("direction_min_delta", 20)),
+        direction_sensitivity=[int(x) for x in m.get("direction_sensitivity", [10, 20, 40])],
         pause_ms=int(m.get("pause_ms", 1000)),
         dwell_cap_ms=int(m.get("dwell_cap_ms", 3000)),
         aoi=[AoiRule(**a) for a in raw.get("aoi", [])],

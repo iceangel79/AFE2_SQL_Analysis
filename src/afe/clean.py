@@ -72,6 +72,11 @@ def load_events(con: sqlite3.Connection, pv: pd.DataFrame) -> pd.DataFrame:
     from .dom import selector_image_map
 
     ev = ev.merge(selector_image_map(con), on=["url", "selector"], how="left")
+    # Selektoren ohne DOM-Treffer (z. B. Lightbox) über den Selektortext einordnen
+    from .dom import click_category
+
+    miss = ev["click_cat"].isna() & ev["selector"].notna()
+    ev.loc[miss, "click_cat"] = ev.loc[miss, "selector"].map(lambda s_: click_category(s_, None))
     return ev.sort_values(["idloghsr", "t_ms", "idhsrevent"]).reset_index(drop=True)
 
 

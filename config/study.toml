@@ -68,6 +68,11 @@ form_url_contains = "kontakt"
 # Matomo speichert x/y relativ zum Element unter der Maus, skaliert auf 0..2000.
 # Mindestbewegung (in Element-Einheiten), damit ein Richtungswechsel zählt (filtert Zittern)
 direction_min_delta = 20
+# Sensitivitätsanalyse: dieselbe Kennzahl mit diesen Schwellen (Tabelle im Bericht).
+# Eine Umrechnung in Pixel ist nicht möglich: Der DOM-Snapshot enthält Masse nur für
+# einzelne Bilder; die Grösse der übrigen Elemente entsteht erst beim Rendern im Browser.
+# Bei einem 600 px breiten Element entsprechen 20 Einheiten etwa 6 px (20/2000 * 600).
+direction_sensitivity = [10, 20, 40]
 # Lücke zwischen zwei Mausereignissen, ab der eine Pause (Zögern) gezählt wird (ms)
 pause_ms = 1000
 # Obergrenze, mit der eine Lücke höchstens zur AOI-Verweildauer beiträgt (ms).

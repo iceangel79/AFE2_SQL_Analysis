@@ -125,6 +125,13 @@ Analyse-Datenbank oder ins Repo) und schreibt `output\verlosung.xlsx` mit den Bl
 | `scroll_reversals` | Wechsel der Scrollrichtung |
 | `aoi_portrait_dwell_ms` | Verweildauer der Maus auf dem Porträt |
 | `aoi_portrait_hovered` | Porträt überhaupt mit der Maus berührt (ja/nein) |
+| `clicks_navigation` | Klicks auf Menüpunkte und Links (Seitenwechsel) |
+| `clicks_formular` | Klicks in den Fragebogen (Auswahlfelder, Absenden) |
+| `clicks_bild`, `clicks_lightbox` | Klicks auf Bilder (öffnet Vergrösserung) bzw. in der geöffneten Vergrösserung |
+| `clicks_sonstiges` | Klicks auf Text und Flächen |
+| `clicks_ohne_navigation` | alle Klicks ausser Navigation (fairer Variantenvergleich, der Onepager hat kein Menü) |
+| `clicks_inhalt` | Klicks auf Inhalte: Bild + Lightbox + Sonstiges (ohne Navigation und Formular) |
+| `dir_change_rate_t10/t20/t40` | Richtungswechsel pro s mit Mindestbewegung 10/20/40 Einheiten (Sensitivität) |
 | `n_images_hovered` | Anzahl verschiedener Inhaltsbilder, über die die Maus gefahren ist |
 | `image_clicks` | Klicks auf Inhaltsbilder (öffnet die Vergrösserung/Lightbox) |
 | `lightbox_ms` | Zeit mit der Maus in der geöffneten Vergrösserung |
@@ -139,6 +146,17 @@ die eine Seite mit dem Bild aufgerufen haben (`afe.bat images` zeigt alle Bilder
 (skaliert auf 0–2000), nicht in Bildschirmpixeln. Absolute Pfadlängen oder eine
 klassische Movement Path Entropy sind deshalb ohne Rekonstruktion des Layouts nicht
 möglich. Details in `AGENTS.md`.
+
+## Lesehilfe Statistik
+
+- Gruppenvergleiche immer «a vs. b» (z. B. OP vs. ML); Spalte **höher in** nennt die Gruppe mit den höheren Werten.
+- Mann-Whitney: Effekt = rang-biseriale Korrelation (positiv = a höher).
+- Fisher: Effekt = Risikodifferenz (Anteil a minus Anteil b) mit 95 %-KI; zusätzlich Odds Ratio roh und
+  mit Haldane-Korrektur (bei Nullzellen).
+- Holm-Korrektur je Testfamilie (z. B. «angeklickt nach Variante» über 8 Bilder). Einzeltests bilden eigene Familien.
+- Geschlechtsvergleiche zusätzlich nur innerhalb ML und als logistische Regression mit Variante als Kovariate
+  (Geschlecht und Variante sind vermischt, siehe Kreuztabelle im Bericht).
+- H5 nennt Prädiktoren, n/k und adjustiertes R².
 
 ## Struktur
 

@@ -183,10 +183,48 @@ def selector_image_map(con: sqlite3.Connection) -> pd.DataFrame:
         idx = DomIndex(dom)
         for sel in g["selector"]:
             nodes = idx.select(sel)
-            img = image_for_node(nodes[0]) if len(nodes) == 1 else None
-            if img:
-                rows.append({"url": url, "selector": sel, "image": img})
-    return pd.DataFrame(rows, columns=["url", "selector", "image"])
+            node = nodes[0] if len(nodes) == 1 else None
+            img = image_for_node(node) if node is not None else None
+            rows.append({"url": url, "selector": sel, "image": img, "click_cat": click_category(sel, node)})
+    out = pd.DataFrame(rows, columns=["url", "selector", "image", "click_cat"])
+    return out
+
+
+_IMAGE_HREF = re.compile(r"\.(?:jpe?g|png|gif|webp)(?:\?.*)?$", re.I)
+CLICK_CATEGORIES = ("navigation", "bild", "lightbox", "formular", "sonstiges")
+
+
+def click_category(selector: str, node: dict | None) -> str:
+    """Art des angeklickten Elements.
+
+    - lightbox:   Elemente der geöffneten Vergrösserung (Schliessen, Blättern, Overlay)
+    - bild:       Bild bzw. Link auf eine Bilddatei (öffnet die Vergrösserung)
+    - navigation: Menüpunkte und alle übrigen Links (Seitenwechsel, Anker)
+    - formular:   Felder und Knöpfe des Fragebogens
+    - sonstiges:  Klicks auf Text, Flächen usw.
+    Die Lightbox wird erst beim Öffnen erzeugt und fehlt im ersten DOM-Snapshot; sie wird
+    daher über den Selektor erkannt. Gleiches gilt als Rückfall, wenn der Selektor im
+    Snapshot nicht eindeutig auflösbar ist.
+    """
+    sel = selector or ""
+    if sel.startswith(("div#lightbox", "div#lightboxOverlay")):
+        return "lightbox"
+    if "wpforms" in sel:
+        return "formular"
+    if node is None:
+        if "menu-item" in sel or sel.startswith(("nav", "ul#ast-hf")):
+            return "navigation"
+        return "bild" if sel.endswith("img") else "sonstiges"
+    n = node
+    while n is not None:
+        tag = n.get("tagName")
+        if tag in ("FORM", "INPUT", "BUTTON", "SELECT", "TEXTAREA", "LABEL"):
+            return "formular"
+        if tag == "A":
+            href = n.get("attributes", {}).get("href", "")
+            return "bild" if _IMAGE_HREF.search(href) else "navigation"
+        n = n.get("_parent")
+    return "bild" if node.get("tagName") == "IMG" else "sonstiges"
 
 
 def page_images(con: sqlite3.Connection, content_regex: str = "") -> dict[str, set[str]]:
