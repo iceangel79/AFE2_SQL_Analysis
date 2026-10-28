@@ -100,7 +100,10 @@ def import_dump(sql_path: str | Path, db_path: Path = DB_PATH, verbose: bool = T
             idx = [i for i, c in enumerate(cols) if allowed is None or c in allowed]
             names = ", ".join(f'"{cols[i]}"' for i in idx)
             ph = ", ".join("?" for _ in idx)
-            values = [[r[i] for i in idx] for r in rows]
+            types = dict(schemas[src])
+            conv = [sqldump.to_bytes if _SQLITE_TYPES.get(types.get(cols[i], ""), "TEXT") == "BLOB"
+                    else sqldump.clean_text for i in idx]
+            values = [[f(r[i]) for f, i in zip(conv, idx)] for r in rows]
             if dst == "wpforms_entries":
                 fpos = [cols[i] for i in idx].index("fields")
                 for v in values:
@@ -136,6 +139,7 @@ def _add_decoded_blobs(con: sqlite3.Connection) -> None:
         if val is None:
             out.append((None, idb))
             continue
+        val = sqldump.to_bytes(val)
         try:
             raw = zlib.decompress(val) if comp else val
             out.append((raw.decode("utf-8", errors="replace"), idb))

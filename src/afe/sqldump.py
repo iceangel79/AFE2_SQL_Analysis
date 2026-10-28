@@ -20,7 +20,7 @@ _COLDEF_RE = re.compile(r"^\s*`(?P<name>[^`]+)`\s+(?P<type>[a-zA-Z]+)", re.M)
 
 # Ein einzelner Wert innerhalb eines Tupels
 _VALUE_RE = re.compile(
-    r"""\s*(?:
+    r"""\s*(?:_binary\s*)?(?:
         '(?P<str>(?:[^'\\]|\\.)*)'          # String mit Escapes
       | 0x(?P<hex>[0-9A-Fa-f]*)                 # Hex-Blob
       | (?P<null>NULL)
@@ -56,7 +56,27 @@ def _convert(m: re.Match) -> object:
 
 
 def read_text(path: str | Path) -> str:
-    return Path(path).read_text(encoding="utf-8", errors="replace")
+    """Liest den Dump als UTF-8. Ungültige Bytes (rohe Binärdaten in Blob-Spalten, wenn in
+    phpMyAdmin "Binärspalten in Hexadezimalnotation" ausgeschaltet war) bleiben dank
+    surrogateescape verlustfrei erhalten und lassen sich mit to_bytes() zurückgewinnen."""
+    return Path(path).read_text(encoding="utf-8", errors="surrogateescape")
+
+
+def to_bytes(value: object) -> object:
+    """Blob-Wert als bytes: Hex-Werte sind schon bytes, Binär-Strings werden zurückkodiert."""
+    if isinstance(value, str):
+        return value.encode("utf-8", errors="surrogateescape")
+    return value
+
+
+def clean_text(value: object) -> object:
+    """Text ohne Surrogate (ungültige Bytes werden durch U+FFFD ersetzt)."""
+    if isinstance(value, str):
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError:
+            return value.encode("utf-8", errors="surrogateescape").decode("utf-8", errors="replace")
+    return value
 
 
 def table_schemas(text: str) -> dict[str, list[tuple[str, str]]]:

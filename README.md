@@ -38,7 +38,9 @@ Bei Problemen die Umgebung neu aufbauen: `powershell -ExecutionPolicy Bypass -Fi
    `wp_matomo_log_action`, `wp_matomo_log_hsr`, `wp_matomo_log_hsr_blob`,
    `wp_matomo_log_hsr_event`, `wp_matomo_log_hsr_site`, `wp_matomo_log_visit`,
    `wp_matomo_site_hsr`, `wp_wpforms_entries`
-2. Die `.sql`-Datei nach `data\raw\` kopieren.
+   Empfohlen: unter *Formatspezifische Optionen* «Binärspalten in Hexadezimalnotation exportieren»
+   anhaken (Standard). Ohne diese Option funktioniert der Import auch, die Datei ist aber fehleranfälliger.
+2. Die `.sql`-Datei nach `data\raw\` kopieren (der neuste Dump wird automatisch verwendet).
 3. Auswertung starten:
    ```
    afe.bat all
