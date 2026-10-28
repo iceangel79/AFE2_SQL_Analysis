@@ -7,7 +7,7 @@ name = "afe"
 version = "0.1.0"
 description = "Reproduzierbare Auswertung der Matomo-Maus-Tracking-Daten für die AFE2-Studie (FFHS MSc WI)"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 authors = [{ name = "Adrian Wegmann" }, { name = "Adrian Martic" }]
 
 [project.scripts]

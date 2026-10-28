@@ -15,8 +15,9 @@ keine Blackbox.
 
 ## Einrichtung (Windows, einmal pro Rechner)
 
-1. **Python 3.12** installieren: <https://www.python.org/downloads/>
-   (bei der Installation «Add python.exe to PATH» anhaken).
+1. **Python 3.14** installieren (mindestens 3.12), z. B. `winget install Python.Python.3.14`
+   oder über <https://www.python.org/downloads/>. Die `.venv` übernimmt die Python-Version,
+   mit der sie erstellt wurde; nach einem Versionswechsel deshalb `-Recreate` verwenden (siehe unten).
 2. Repo klonen:
    ```
    git clone https://github.com/iceangel79/AFE2_SQL_Analysis.git

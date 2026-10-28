@@ -133,7 +133,7 @@ Besuche mit Selektoren `wp-admin-bar` stammen von eingeloggten Admins und werden
   Effektstärken immer mit angeben.
 
 ### Code
-- Python ≥ 3.11 (Ziel 3.12), Abhängigkeiten nur über `requirements.txt` mit fixierten Versionen.
+- Python ≥ 3.12 (Ziel 3.14), Abhängigkeiten nur über `requirements.txt` mit fixierten Versionen.
   Neue Pakete nur, wenn nötig, und dann dort eintragen.
 - Bezeichner auf Englisch, Kommentare, Docstrings, Ausgaben und Doku auf Deutsch.
 - Schweizer Rechtschreibung: kein «ß», immer «ss». Keine Gender-Sonderzeichen (*, :, /).

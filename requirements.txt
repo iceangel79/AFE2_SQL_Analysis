@@ -1,4 +1,4 @@
-# Abhängigkeiten für die AFE2-Auswertung (Python 3.12 empfohlen, mind. 3.11)
+# Abhängigkeiten für die AFE2-Auswertung (Python 3.14 empfohlen, mind. 3.12 wegen numpy/scipy)
 # Installation: setup.bat (Windows) bzw. pip install -r requirements.txt
 # Versionen sind fixiert, damit alle Rechner identische Ergebnisse liefern.
 

@@ -9,17 +9,18 @@ $ErrorActionPreference = "Continue"
 Set-Location -Path $PSScriptRoot
 
 function Find-Python {
-    # Bevorzugt den Python-Launcher "py" mit 3.12, sonst 3.13/3.11, sonst "python".
+    # Bevorzugt den Python-Launcher "py" mit 3.14, sonst 3.13/3.12, sonst "python".
+    # Mindestversion 3.12 (numpy und scipy in requirements.txt verlangen sie).
     # Rueckgabe als Objekt (Exe + Args): PowerShell wuerde ein Array mit nur einem
     # Element beim return in einen einfachen String umwandeln.
-    foreach ($v in @("3.12", "3.13", "3.11")) {
+    foreach ($v in @("3.14", "3.13", "3.12")) {
         try {
             & py "-$v" -c "import sys" 2>$null
             if ($LASTEXITCODE -eq 0) { return [pscustomobject]@{ Exe = "py"; Args = @("-$v") } }
         } catch { }
     }
     try {
-        $ok = & python -c "import sys; print(sys.version_info >= (3, 11))" 2>$null
+        $ok = & python -c "import sys; print(sys.version_info >= (3, 12))" 2>$null
         if ($ok -eq "True") { return [pscustomobject]@{ Exe = "python"; Args = @() } }
     } catch { }
     return $null
@@ -33,8 +34,8 @@ if ($Recreate -and (Test-Path ".venv")) {
 if (-not (Test-Path ".venv\Scripts\python.exe")) {
     $py = Find-Python
     if (-not $py) {
-        Write-Host "Kein Python >= 3.11 gefunden." -ForegroundColor Red
-        Write-Host "Bitte Python 3.12 installieren: https://www.python.org/downloads/ (Haken bei 'Add python.exe to PATH' setzen)"
+        Write-Host "Kein Python >= 3.12 gefunden." -ForegroundColor Red
+        Write-Host "Bitte Python 3.14 installieren: winget install Python.Python.3.14  oder  https://www.python.org/downloads/"
         exit 1
     }
     $pyArgs = @($py.Args)
