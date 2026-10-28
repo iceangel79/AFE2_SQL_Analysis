@@ -130,7 +130,9 @@ def report(ds: Dataset | None = None) -> None:
         if f:
             figs.append(f)
 
+    prov = _provenance(ds)
     with pd.ExcelWriter(OUTPUT / "tabellen.xlsx") as xw:
+        prov.to_excel(xw, sheet_name="Info", index=False)
         ds.flow.to_excel(xw, sheet_name="Stichprobe", index=False)
         comparison.to_excel(xw, sheet_name="Variantenvergleich", index=False)
         img_summary.to_excel(xw, sheet_name="Bilder nach Variante", index=False)
@@ -145,9 +147,37 @@ def report(ds: Dataset | None = None) -> None:
             ds.entries.drop(columns=["feedback"], errors="ignore").to_excel(xw, sheet_name="Fragebogen", index=False)
             merged.to_excel(xw, sheet_name="Besuche+Fragebogen", index=False)
 
-    _write_markdown(ds, comparison, hyp, figs, img_summary, img_gender, img_tests)
+    _write_markdown(ds, comparison, hyp, figs, img_summary, img_gender, img_tests, prov)
     print(f"Bericht: {OUTPUT / 'bericht.md'}")
     print(f"Tabellen: {OUTPUT / 'tabellen.xlsx'}")
+
+
+def _provenance(ds: Dataset) -> pd.DataFrame:
+    """Herkunft der Zahlen: Code-Version, Quelldatei, Zeitpunkt."""
+    import subprocess
+
+    from .config import ROOT
+    from .load import connect
+
+    def git(*args: str) -> str:
+        try:
+            return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True, timeout=5).stdout.strip()
+        except Exception:
+            return ""
+
+    commit = git("rev-parse", "--short", "HEAD") or "unbekannt"
+    if git("status", "--porcelain", "--", "src", "config"):
+        commit += " (mit lokalen Änderungen an Code/Konfiguration)"
+    con = connect()
+    try:
+        row = con.execute("SELECT value FROM _meta WHERE key='source_file'").fetchone()
+    finally:
+        con.close()
+    return pd.DataFrame([
+        ("Erstellt", dt.datetime.now().strftime("%d.%m.%Y %H:%M")),
+        ("Code-Version (Git-Commit)", commit),
+        ("Quelldatei (SQL-Export)", row[0] if row else "unbekannt"),
+    ], columns=["feld", "wert"])
 
 
 def _fmt(df: pd.DataFrame) -> str:
@@ -163,12 +193,13 @@ def _has_tabulate() -> bool:
 
 
 def _write_markdown(ds: Dataset, comparison: pd.DataFrame, hyp: pd.DataFrame | None, figs: list,
-                    img_summary: pd.DataFrame, img_gender: pd.DataFrame | None, img_tests: pd.DataFrame) -> None:
+                    img_summary: pd.DataFrame, img_gender: pd.DataFrame | None, img_tests: pd.DataFrame,
+                    prov: pd.DataFrame) -> None:
     cfg = ds.cfg
     lines = [
         "# AFE2 Auswertung",
         "",
-        f"Erstellt: {dt.datetime.now():%d.%m.%Y %H:%M}",
+        *[f"- {r.feld}: {r.wert}" for r in prov.itertuples()],
         "",
         "## Einstellungen",
         "",
