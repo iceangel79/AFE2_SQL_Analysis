@@ -39,7 +39,8 @@ Bei Problemen die Umgebung neu aufbauen: `powershell -ExecutionPolicy Bypass -Fi
    `wp_matomo_log_hsr_event`, `wp_matomo_log_hsr_site`, `wp_matomo_log_visit`,
    `wp_matomo_site_hsr`, `wp_wpforms_entries`
    Empfohlen: unter *Formatspezifische Optionen* «Binärspalten in Hexadezimalnotation exportieren»
-   anhaken (Standard). Ohne diese Option funktioniert der Import auch, die Datei ist aber fehleranfälliger.
+   anhaken (Standard). Der Import verarbeitet aber auch Binärwerte als Text, z. B. leere Blobs,
+   die phpMyAdmin trotz dieser Option als `''` exportiert.
 2. Die `.sql`-Datei nach `data\raw\` kopieren (der neuste Dump wird automatisch verwendet).
 3. Auswertung starten:
    ```
