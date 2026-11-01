@@ -151,12 +151,20 @@ def _descendant_images(node: dict) -> list[dict]:
     return out
 
 
+IMAGE_WRAPPERS = ("A", "FIGURE", "PICTURE")
+
+
 def image_for_node(node: dict) -> str | None:
-    """Bild unter dem Element: das IMG selbst, ein einziges IMG darin (figure, a) oder None."""
-    if node.get("tagName") == "IMG":
+    """Bild unter der Maus: das IMG selbst oder sein direkter Rahmen (A, FIGURE, PICTURE)
+    mit genau einem IMG darin. Grössere Container (Spalten, Zeilen, div#content) zählen
+    bewusst nicht, auch wenn sie nur ein Bild enthalten: Die Maus liegt dann neben dem Bild."""
+    tag = node.get("tagName")
+    if tag == "IMG":
         imgs = [node]
-    else:
+    elif tag in IMAGE_WRAPPERS:
         imgs = _descendant_images(node)
+    else:
+        return None
     raw = [i.get("attributes", {}).get("src", "") for i in imgs]
     srcs = {normalize_image(r) for r in raw if r and not r.startswith("data:")}
     return srcs.pop() if len(srcs) == 1 else None

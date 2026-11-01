@@ -75,3 +75,21 @@ def test_logistic_reports_separation():
                        "variant": ["ML"] * 12 + ["OP"] * 8})
     r = logistic_with_covariate(df, "f", "geschlecht", "weiblich", "variant", "OP", "t")
     assert "perfekte Trennung" in r["hinweis"]
+
+
+def test_container_is_not_an_image():
+    """Spalten-Container mit genau einem Bild zählen nicht als Bild (Maus liegt daneben)."""
+    idx = DomIndex(DOM)
+    div = idx.select("article#post-1 > div.special")[0]
+    assert image_for_node(div) is None
+
+
+def test_click_sum_check():
+    import pandas as pd
+    import pytest
+    from afe.features import CLICK_CATEGORY_COLS, check_click_sum
+
+    ok = pd.DataFrame([{c: 1 for c in CLICK_CATEGORY_COLS} | {"n_clicks": 5}])
+    check_click_sum(ok)
+    with pytest.raises(AssertionError):
+        check_click_sum(ok.assign(n_clicks=6))

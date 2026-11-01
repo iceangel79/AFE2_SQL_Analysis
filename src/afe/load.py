@@ -115,6 +115,7 @@ def import_dump(sql_path: str | Path, db_path: Path = DB_PATH, verbose: bool = T
         _create_indexes(con)
         con.execute("CREATE TABLE _meta (key TEXT PRIMARY KEY, value TEXT)")
         con.execute("INSERT INTO _meta VALUES ('source_file', ?)", (Path(sql_path).name,))
+        con.execute("INSERT INTO _meta VALUES ('source_sha256', ?)", (sha256_file(sql_path),))
         con.commit()
     finally:
         con.close()
@@ -126,6 +127,17 @@ def import_dump(sql_path: str | Path, db_path: Path = DB_PATH, verbose: bool = T
         if missing:
             print(f"  Hinweis: fehlende Tabellen im Dump: {', '.join(missing)}")
     return counts
+
+
+def sha256_file(path: str | Path) -> str:
+    """SHA-256-Prüfsumme des SQL-Exports: belegt eindeutig, welcher Datenstand ausgewertet wurde."""
+    import hashlib
+
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def _add_decoded_blobs(con: sqlite3.Connection) -> None:

@@ -336,3 +336,37 @@ def image_tests(avail: pd.DataFrame) -> pd.DataFrame:
             "risikodifferenz", "rd_ki_unten", "rd_ki_oben", "odds_ratio", "odds_ratio_haldane",
             "signifikant", "hinweis"]
     return out.reindex(columns=cols)
+
+
+def ueq_by_gender(quest: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """UEQ-S nach Geschlecht (und Variante x Geschlecht) sowie OLS ueqs_total ~ Variante + Geschlecht.
+
+    Nur beschreibend: prüft, ob der Variantenunterschied in H3b durch die ungleiche
+    Geschlechterverteilung erklärt sein könnte."""
+    import statsmodels.formula.api as smf
+
+    q = quest[quest["geschlecht"].isin(["weiblich", "männlich"])].copy()
+    scales = ["ueqs_pragmatic", "ueqs_hedonic", "ueqs_total"]
+    desc = []
+    for keys, g in list(q.groupby("geschlecht")) + list(q.groupby(["variante", "geschlecht"])):
+        label = keys if isinstance(keys, str) else " / ".join(keys)
+        row = {"gruppe": label, "n": len(g)}
+        for c in scales:
+            row[f"{c}_mittel"] = g[c].mean()
+            row[f"{c}_median"] = g[c].median()
+        desc.append(row)
+    desc = pd.DataFrame(desc)
+
+    d = q.dropna(subset=["ueqs_total"])
+    if len(d) < 6 or d["variante"].nunique() < 2 or d["geschlecht"].nunique() < 2:
+        return desc, pd.DataFrame([{"term": "Modell", "hinweis": "zu wenig Daten"}])
+    m = smf.ols("ueqs_total ~ C(variante, Treatment('ML')) + C(geschlecht, Treatment('männlich'))", data=d).fit()
+    ci = m.conf_int()
+    names = {"Intercept": "Konstante (ML, männlich)",
+             "C(variante, Treatment('ML'))[T.OP]": "Variante OP (vs. ML)",
+             "C(geschlecht, Treatment('männlich'))[T.weiblich]": "Geschlecht weiblich (vs. männlich)"}
+    rows = [{"term": names.get(t, t), "koeffizient": m.params[t], "ki_unten": ci.loc[t, 0],
+             "ki_oben": ci.loc[t, 1], "p": m.pvalues[t]} for t in m.params.index]
+    rows.append({"term": f"n = {int(m.nobs)}, R² = {m.rsquared:.3f}, adj. R² = {m.rsquared_adj:.3f}",
+                 "koeffizient": np.nan, "ki_unten": np.nan, "ki_oben": np.nan, "p": m.f_pvalue})
+    return desc, pd.DataFrame(rows)

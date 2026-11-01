@@ -135,7 +135,8 @@ def pageview_features(pv: pd.DataFrame, ev: pd.DataFrame, cfg: StudyConfig) -> p
         imgs = mouse["image"] if "image" in mouse else pd.Series(dtype=object)
         has_img = imgs.notna().to_numpy() if len(mouse) else np.array([], dtype=bool)
         r["n_images_hovered"] = int(imgs.dropna().nunique())
-        r["image_clicks"] = int(((mouse["event_type"] == 2).to_numpy() & has_img).sum()) if len(mouse) else 0
+        # Klicks auf Bilder = Kategorie "bild" (Bild bzw. Bildlink, öffnet die Vergrösserung)
+        r["image_clicks"] = r["clicks_bild"]
         lb = mouse["selector"].fillna("").str.startswith(("div#lightbox", "div#lightboxOverlay")).to_numpy() if len(mouse) else np.array([], dtype=bool)
         r["lightbox_ms"] = float(hold[lb].sum()) if len(t) else 0.0
         r["image_dwell_ms"] = float(hold[has_img].sum()) if len(t) else 0.0
@@ -181,6 +182,7 @@ def visit_features(visits: pd.DataFrame, pvf: pd.DataFrame) -> pd.DataFrame:
     agg["time_to_form_wall_s"] = form_wall.groupby(pvf["idvisit"]).min()
     agg["pages_before_form"] = first_form_pv - 1
     agg["reached_form"] = agg["time_to_form_s"].notna()
+    check_click_sum(agg)
 
     total_s = agg["time_on_page_ms"] / 1000
     agg["time_total_s"] = total_s
@@ -193,24 +195,48 @@ def visit_features(visits: pd.DataFrame, pvf: pd.DataFrame) -> pd.DataFrame:
 
 
 # Kennzahlen, die im Variantenvergleich und in den Grafiken verwendet werden
+CLICK_CATEGORY_COLS = ["clicks_navigation", "clicks_bild", "clicks_lightbox", "clicks_formular", "clicks_sonstiges"]
+
 KEY_METRICS = {
     "time_total_s": "Gesamtzeit (s)",
     "time_to_form_s": "Zeit bis Formular (s)",
-    "n_clicks": "Klicks",
+    "n_clicks": "Klicks total",
+    "clicks_navigation": "  davon Navigation (Menü/Links)",
+    "clicks_bild": "  davon Bild (öffnet Vergrösserung)",
+    "clicks_lightbox": "  davon in geöffneter Vergrösserung",
+    "clicks_formular": "  davon Formular",
+    "clicks_sonstiges": "  davon Sonstiges (Text, Flächen)",
     "clicks_ohne_navigation": "Klicks ohne Navigation",
-    "clicks_inhalt": "Klicks auf Inhalte (ohne Navigation/Formular)",
-    "clicks_navigation": "Klicks Navigation (Menü/Links)",
-    "clicks_formular": "Klicks Formular",
-    "clicks_sonstiges": "Klicks Sonstiges",
+    "clicks_inhalt": "Klicks auf Inhalte (Bild + Vergrösserung + Sonstiges)",
     "dir_change_rate": "Richtungswechsel pro s",
     "switch_rate": "Elementwechsel pro s",
     "pause_share": "Anteil Pausenzeit",
     "scroll_reversals": "Scroll-Richtungswechsel",
     "aoi_portrait_dwell_ms": "Verweildauer Porträt (ms)",
     "n_images_hovered": "Bilder überfahren (Anzahl)",
-    "image_clicks": "Klicks auf Bilder (Vergrösserung)",
     "lightbox_ms": "Zeit in Vergrösserung (ms)",
 }
+
+
+def check_click_sum(df: pd.DataFrame) -> None:
+    """Summenkontrolle: Jeder Klick gehört genau einer Kategorie an."""
+    diff = df[CLICK_CATEGORY_COLS].sum(axis=1) - df["n_clicks"]
+    if (diff != 0).any():
+        raise AssertionError(f"Klick-Kategorien summieren sich nicht zu n_clicks ({int((diff != 0).sum())} Zeilen)")
+
+
+def click_breakdown(visits: pd.DataFrame) -> pd.DataFrame:
+    """Mittelwerte der Klick-Kategorien je Variante inkl. Summenkontrolle."""
+    rows = []
+    for v, g in visits.groupby("variant"):
+        r = {"variante": v, "n_besuche": len(g)}
+        for c in CLICK_CATEGORY_COLS:
+            r[c.replace("clicks_", "")] = g[c].mean()
+        r["summe_kategorien"] = g[CLICK_CATEGORY_COLS].sum(axis=1).mean()
+        r["klicks_total"] = g["n_clicks"].mean()
+        r["kontrolle"] = "ok" if np.isclose(r["summe_kategorien"], r["klicks_total"]) else "FEHLER"
+        rows.append(r)
+    return pd.DataFrame(rows)
 
 
 def selector_summary(ev: pd.DataFrame) -> pd.DataFrame:

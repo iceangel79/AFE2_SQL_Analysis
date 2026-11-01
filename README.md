@@ -137,7 +137,9 @@ Analyse-Datenbank oder ins Repo) und schreibt `output\verlosung.xlsx` mit den Bl
 | `lightbox_ms` | Zeit mit der Maus in der geöffneten Vergrösserung |
 
 Bilder werden erkannt, indem der CSS-Selektor jedes Mausereignisses im gespeicherten
-DOM-Snapshot der Seite aufgelöst wird (`dom.py`). Der Bericht enthält pro Bild und Variante
+DOM-Snapshot der Seite aufgelöst wird (`dom.py`). Als Bild zählt nur das Bild selbst bzw. sein
+Link-/Figure-Rahmen, nicht umgebende Container. Jeder Klick gehört genau einer Kategorie an
+(Summenkontrolle im Code und als Tabelle im Bericht). Der Bericht enthält pro Bild und Variante
 und Geschlecht den Anteil Besuche, die es überfahren bzw. angeklickt haben, sowie explorative
 Tests je Bild (Fisher bzw. Mann-Whitney, Holm-korrigiert je Testfamilie). Basis sind nur Besuche,
 die eine Seite mit dem Bild aufgerufen haben (`afe.bat images` zeigt alle Bilder).
@@ -146,6 +148,20 @@ die eine Seite mit dem Bild aufgerufen haben (`afe.bat images` zeigt alle Bilder
 (skaliert auf 0–2000), nicht in Bildschirmpixeln. Absolute Pfadlängen oder eine
 klassische Movement Path Entropy sind deshalb ohne Rekonstruktion des Layouts nicht
 möglich. Details in `AGENTS.md`.
+
+## Datenstand einfrieren
+
+Bericht und Excel (Blatt «Info») nennen Git-Commit, Git-Tag, Quelldatei, deren SHA-256-Prüfsumme
+und den Zeitpunkt der letzten Aufzeichnung bzw. des letzten Formulareintrags. Für die Arbeit den
+finalen Stand markieren:
+
+```
+git tag -a v1.0-final -m "Finaler Auswertungsstand"
+git push origin v1.0-final
+afe.bat all
+```
+
+`afe.bat all` nach dem Tag ausführen, damit der Tag im Bericht erscheint.
 
 ## Lesehilfe Statistik
 

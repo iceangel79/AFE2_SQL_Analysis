@@ -104,6 +104,7 @@ def report(ds: Dataset | None = None) -> None:
     inc = ds.included
 
     comparison = stats.compare_variants(inc, features.KEY_METRICS)
+    clicks = features.click_breakdown(inc)
     avail = features.image_availability(ds.image_usage, inc, ds.pageviews, ds.page_images)
     if ds.entries is not None:
         gender = ds.entries.loc[ds.entries["mouse_included"], ["idvisit", "geschlecht"]].dropna().drop_duplicates("idvisit")
@@ -123,6 +124,7 @@ def report(ds: Dataset | None = None) -> None:
             stats.crosstab_variant_gender(merged, "variant", "Maus+Fragebogen"),
         ], ignore_index=True).fillna(0)
         extra["sensitivity"] = stats.sensitivity_h1(merged, inc, ds.cfg.direction_sensitivity)
+        extra["ueq_gender"], extra["ueq_model"] = stats.ueq_by_gender(ds.questionnaire)
 
     figs = [plots.boxplots(inc, features.KEY_METRICS, fig_dir), plots.page_paths(ds.pageviews, ds.visits, fig_dir)]
     for f in (plots.image_usage(img_summary, fig_dir),
@@ -141,6 +143,7 @@ def report(ds: Dataset | None = None) -> None:
         prov.to_excel(xw, sheet_name="Info", index=False)
         ds.flow.to_excel(xw, sheet_name="Stichprobe", index=False)
         comparison.to_excel(xw, sheet_name="Variantenvergleich", index=False)
+        clicks.to_excel(xw, sheet_name="Klicks nach Kategorie", index=False)
         img_summary.to_excel(xw, sheet_name="Bilder nach Variante", index=False)
         if img_gender is not None:
             img_gender.to_excel(xw, sheet_name="Bilder nach Geschlecht", index=False)
@@ -152,9 +155,12 @@ def report(ds: Dataset | None = None) -> None:
             extra["crosstab"].to_excel(xw, sheet_name="Variante x Geschlecht", index=False)
             hyp.to_excel(xw, sheet_name="Hypothesen", index=False)
             extra["sensitivity"].to_excel(xw, sheet_name="Sensitivität Richtung", index=False)
+            extra["ueq_gender"].to_excel(xw, sheet_name="UEQ-S nach Geschlecht", index=False)
+            extra["ueq_model"].to_excel(xw, sheet_name="UEQ-S Modell", index=False)
             ds.entries.drop(columns=["feedback"], errors="ignore").to_excel(xw, sheet_name="Fragebogen", index=False)
             merged.to_excel(xw, sheet_name="Besuche+Fragebogen", index=False)
 
+    extra["clicks"] = clicks
     _write_markdown(ds, comparison, hyp, figs, img_summary, img_gender, img_tests, prov, extra)
     print(f"Bericht: {OUTPUT / 'bericht.md'}")
     print(f"Tabellen: {OUTPUT / 'tabellen.xlsx'}")
@@ -178,13 +184,29 @@ def _provenance(ds: Dataset) -> pd.DataFrame:
         commit += " (mit lokalen Änderungen an Code/Konfiguration)"
     con = connect()
     try:
-        row = con.execute("SELECT value FROM _meta WHERE key='source_file'").fetchone()
+        meta = dict(con.execute("SELECT key, value FROM _meta").fetchall())
+        last_hsr = con.execute("SELECT MAX(server_time) FROM log_hsr").fetchone()[0]
+        has_forms = con.execute("SELECT 1 FROM sqlite_master WHERE name='wpforms_entries'").fetchone()
+        last_form = con.execute("SELECT MAX(date) FROM wpforms_entries").fetchone()[0] if has_forms else None
     finally:
         con.close()
+
+    def local(ts: str | None) -> str:
+        if not ts:
+            return "–"
+        t = pd.Timestamp(ts).tz_localize("UTC").tz_convert(ds.cfg.timezone)
+        return t.strftime("%d.%m.%Y %H:%M:%S") + " (Lokalzeit)"
+
+    tags = git("tag", "--points-at", "HEAD")
     return pd.DataFrame([
         ("Erstellt", dt.datetime.now().strftime("%d.%m.%Y %H:%M")),
         ("Code-Version (Git-Commit)", commit),
-        ("Quelldatei (SQL-Export)", row[0] if row else "unbekannt"),
+        ("Git-Tag", tags.replace("\n", ", ") if tags else "–"),
+        ("Quelldatei (SQL-Export)", meta.get("source_file", "unbekannt")),
+        ("SHA-256 der Quelldatei", meta.get("source_sha256", "unbekannt (neu importieren)")),
+        ("Letzte Aufzeichnung (Matomo)", local(last_hsr)),
+        ("Letzter Formulareintrag (WPForms)", local(last_form)),
+        ("Feldphase gemäss Konfiguration", f"{ds.cfg.field_start or 'offen'} bis {ds.cfg.field_end or 'offen'}"),
     ], columns=["feld", "wert"])
 
 
@@ -235,6 +257,12 @@ def _write_markdown(ds: Dataset, comparison: pd.DataFrame, hyp: pd.DataFrame | N
              .rename(columns={"hoeher_in": "höher in", "ML_anteil_gt0": "ML Anteil > 0",
                               "OP_anteil_gt0": "OP Anteil > 0"})),
         "",
+        "### Klicks nach Kategorie (Mittelwerte je Besuch, mit Summenkontrolle)",
+        "",
+        "Jeder Klick gehört genau einer Kategorie an; die Summe der Kategorien entspricht dem Total.",
+        "",
+        _fmt(extra["clicks"]),
+        "",
         "## Bilder: überfahren und angeklickt (Vergrösserung)",
         "",
         "Basis: eingeschlossene Besuche, die eine Seite mit dem Bild aufgerufen haben.",
@@ -270,6 +298,10 @@ def _write_markdown(ds: Dataset, comparison: pd.DataFrame, hyp: pd.DataFrame | N
         lines += ["## Hypothesen", "",
                   _fmt(hyp[["hypothese", "test", "n", "statistik", "p", "effekt", "hoeher_in", "signifikant", "hinweis"]]
                        .rename(columns={"hoeher_in": "höher in"})), ""]
+        lines += ["## UEQ-S nach Geschlecht (Kontrolle zu H3b, nur beschreibend)", "",
+                  "Fragebogen-Stichprobe. Modell: OLS ueqs_total ~ Variante + Geschlecht "
+                  "(Referenz: ML, männlich; «keine Angabe» ausgeschlossen).", "",
+                  _fmt(extra["ueq_gender"]), "", _fmt(extra["ueq_model"]), ""]
         lines += ["## Sensitivität Richtungswechsel (Schwelle in Element-Einheiten von 0..2000)", "",
                   _fmt(extra["sensitivity"].rename(columns={"hoeher_in": "höher in"})), ""]
     else:
