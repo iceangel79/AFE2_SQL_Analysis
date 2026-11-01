@@ -8,7 +8,7 @@
 # Leer = keine Datumsgrenze (die Pipeline warnt dann).
 # Feldstart 26.10.2026 (Versand der Einladungen); alles davor sind Alpha-/Beta-Tests.
 field_start = "2026-10-26"
-field_end = ""
+field_end = "2026-11-01"
 timezone = "Europe/Zurich"
 # Späterer gültiger Start pro Variante. Am 26.10.2026 zeichnete Matomo in der
 # Menüversion jeweils nur die erste Seite auf (Tracking-Problem, am 27.10. behoben).
